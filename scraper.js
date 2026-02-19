@@ -8,6 +8,8 @@ const QRCode = require('qrcode');
 const express = require('express');
 const Parse = require('./db');
 const { DateTime } = require('luxon');
+const https = require('https');
+const http = require('http');
 
 const path = require('path');
 
@@ -244,6 +246,18 @@ app.get('/api/config', async (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🌐 Servidor Web ativo na porta ${PORT}`);
+
+    // Inicia o auto-ping para evitar que o container durma
+    const APP_URL = process.env.APP_URL || 'https://olx-12ntim1b.b4a.run';
+    setInterval(() => {
+        console.log(`📡 [Keep-Alive] Pinging ${APP_URL}...`);
+        const protocol = APP_URL.startsWith('https') ? https : http;
+        protocol.get(APP_URL, (res) => {
+            console.log(`✅ [Keep-Alive] Status: ${res.statusCode}`);
+        }).on('error', (err) => {
+            console.error(`❌ [Keep-Alive] Erro: ${err.message}`);
+        });
+    }, 10 * 60 * 1000); // A cada 10 minutos
 });
 
 // Inicialização do WhatsApp Client
