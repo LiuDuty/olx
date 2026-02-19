@@ -1,18 +1,26 @@
 const Parse = require('parse/node');
 require('dotenv').config();
 
-const APP_ID = process.env.PARSE_APP_ID || "kPphx4UiPzkVLXZbdG6D0ibRi1KQARQ1uMsxWPQr";
-const JS_KEY = process.env.PARSE_JS_KEY || "bVidsnN1GWSVGnYnMdHvPBxHw39YDcVMwqr5nQlG";
-const MASTER_KEY = process.env.PARSE_MASTER_KEY;
-const SERVER_URL = process.env.PARSE_SERVER_URL || 'https://parseapi.back4app.com/';
+// Garante que não usemos strings vazias das variáveis de ambiente
+const getEnv = (key, fallback) => {
+    const val = process.env[key];
+    return (val && val.trim() !== "") ? val : fallback;
+};
 
-console.log(`🛠️ Inicializando Parse com AppID: ${APP_ID.substring(0, 5)}...`);
-if (!MASTER_KEY) console.warn("⚠️ AVISO: PARSE_MASTER_KEY não configurada. Operações de MasterKey podem falhar.");
+const APP_ID = getEnv("PARSE_APP_ID", "kPphx4UiPzkVLXZbdG6D0ibRi1KQARQ1uMsxWPQr");
+const JS_KEY = getEnv("PARSE_JS_KEY", "bVidsnN1GWSVGnYnMdHvPBxHw39YDcVMwqr5nQlG");
+const MASTER_KEY = getEnv("PARSE_MASTER_KEY", null);
+const SERVER_URL = getEnv("PARSE_SERVER_URL", 'https://parseapi.back4app.com'); // Sem barra no final por precaução
 
-Parse.initialize(APP_ID, JS_KEY, MASTER_KEY);
-Parse.serverURL = SERVER_URL;
+console.log(`🛠️ [DB] Iniciando Parse... (AppID: ${APP_ID.substring(0, 5)}...)`);
 
-// Adiciona uma propriedade para verificar se temos a MasterKey disponível
-Parse.hasMasterKey = !!MASTER_KEY;
+try {
+    Parse.initialize(APP_ID, JS_KEY, MASTER_KEY);
+    Parse.serverURL = SERVER_URL;
+    Parse.hasMasterKey = !!MASTER_KEY;
+    if (!MASTER_KEY) console.warn("⚠️ [DB] Master Key ausente. Algumas funções estarão limitadas.");
+} catch (err) {
+    console.error("💥 [DB] Erro fatal na inicialização do Parse:", err);
+}
 
 module.exports = Parse;

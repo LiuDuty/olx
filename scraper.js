@@ -130,8 +130,12 @@ app.post('/api/set-config', async (req, res) => {
 
         res.json({ success: true, key, value });
     } catch (err) {
-        console.error("❌ Erro na operação API:", err);
-        res.status(500).json({ error: err.message });
+        console.error("❌ ERROR API:", err);
+        res.status(500).json({
+            error: err.message,
+            details: "Verifique os logs do servidor para mais detalhes.",
+            code: err.code
+        });
     }
 });
 
@@ -148,8 +152,12 @@ app.post('/api/set-schedule', async (req, res) => {
         await config.save(null, getOptions());
         res.json({ message: 'Agendamento atualizado', nextRun });
     } catch (err) {
-        console.error("❌ Erro na operação API:", err);
-        res.status(500).json({ error: err.message });
+        console.error("❌ ERROR API:", err);
+        res.status(500).json({
+            error: err.message,
+            details: "Verifique os logs do servidor para mais detalhes.",
+            code: err.code
+        });
     }
 });
 
@@ -173,8 +181,12 @@ app.get('/api/listings', async (req, res) => {
         const results = await query.find(getOptions());
         res.json(results.map(r => r.toJSON()));
     } catch (err) {
-        console.error("❌ Erro na operação API:", err);
-        res.status(500).json({ error: err.message });
+        console.error("❌ ERROR API:", err);
+        res.status(500).json({
+            error: err.message,
+            details: "Verifique os logs do servidor para mais detalhes.",
+            code: err.code
+        });
     }
 });
 
@@ -190,8 +202,12 @@ app.get('/api/status', async (req, res) => {
             res.json({ message: 'Aguardando...', progress: 0 });
         }
     } catch (err) {
-        console.error("❌ Erro na operação API:", err);
-        res.status(500).json({ error: err.message });
+        console.error("❌ ERROR API:", err);
+        res.status(500).json({
+            error: err.message,
+            details: "Verifique os logs do servidor para mais detalhes.",
+            code: err.code
+        });
     }
 });
 
@@ -210,8 +226,12 @@ app.post('/api/update-listing', async (req, res) => {
         await listing.save(null, getOptions());
         res.json({ success: true });
     } catch (err) {
-        console.error("❌ Erro na operação API:", err);
-        res.status(500).json({ error: err.message });
+        console.error("❌ ERROR API:", err);
+        res.status(500).json({
+            error: err.message,
+            details: "Verifique os logs do servidor para mais detalhes.",
+            code: err.code
+        });
     }
 });
 
