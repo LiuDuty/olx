@@ -53,17 +53,21 @@ ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
 WORKDIR /app
 
-# Copiar arquivos de dependências
+# Copiar arquivos de dependências do backend
 COPY package*.json ./
-
-# Instalar dependências do projeto
 RUN npm install
 
-# Copiar o resto do código
+# Copiar e buildar o frontend
+COPY frontend/package*.json ./frontend/
+RUN cd frontend && npm install
+COPY frontend/ ./frontend/
+RUN cd frontend && npm run build
+
+# Copiar o resto do código do backend
 COPY . .
 
-# Expor a porta para visualização do QR Code
+# Expor a porta 3000
 EXPOSE 3000
 
-# Comando para iniciar
+# Comando para iniciar (roda o node scraper.js)
 CMD ["npm", "start"]
