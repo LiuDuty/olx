@@ -50,7 +50,7 @@ const client = new Client({
     }),
     puppeteer: {
         headless: true,
-        executablePath: '/usr/bin/google-chrome-stable', // Tenta o padrão do container ou o do playwright
+        executablePath: '/usr/bin/chromium',
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -109,6 +109,7 @@ async function scrape() {
     console.log("🚀 OLX: Iniciando extração...");
     const browser = await chromium.launch({
         headless: true,
+        executablePath: '/usr/bin/chromium',
         args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
     const context = await browser.newContext({
