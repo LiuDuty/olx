@@ -383,8 +383,8 @@ const client = new Client({
         dataPath: './.wwebjs_auth'
     }),
     puppeteer: {
-        headless: true,
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
+        headless: process.env.HEADLESS === 'false' ? false : true,
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || (process.platform === 'win32' ? null : '/usr/bin/chromium'),
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -394,7 +394,6 @@ const client = new Client({
             '--no-zygote',
             '--disable-gpu',
             '--disable-extensions',
-            '--disable-setuid-sandbox',
             '--font-render-hinting=none',
             '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
         ],
@@ -610,8 +609,8 @@ async function scrape(limit = 50, foundLinks = [], newResults = []) {
     const ignoredLinks = new Set(ignoredListings.map(l => l.get("link").split('?')[0]));
 
     const browser = await chromium.launch({
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
-        headless: true,
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || (process.platform === 'win32' ? null : '/usr/bin/chromium'),
+        headless: process.env.HEADLESS === 'false' ? false : true,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -664,6 +663,12 @@ async function scrape(limit = 50, foundLinks = [], newResults = []) {
                 await updateScraperStatus(`Extraindo anúncio ${count}/${targetUrls.length}`, progress, adUrl, foundLinks);
                 await detailPage.route('**/*.{png,jpg,jpeg,gif,svg,css,woff,woff2}', route => route.abort());
                 await detailPage.goto(adUrl, { waitUntil: 'domcontentloaded', timeout: 40000 });
+
+                const detailTitle = await detailPage.title();
+                if (detailTitle.includes("Access Denied") || detailTitle.includes("Cloudflare")) {
+                    console.error(`🚫 Bloqueio detectado em: ${adUrl}`);
+                    continue; // Pula para o próximo link
+                }
 
                 const price = await detailPage.evaluate(() => {
                     const el = document.querySelector('span[data-testid="ad-price"]') ||
