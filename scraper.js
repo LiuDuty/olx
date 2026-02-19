@@ -27,6 +27,7 @@ const PORT = process.env.PORT || 3000;
 
 let lastQrCode = null;
 let isScraping = false;
+let whatsappStatus = 'Iniciando...';
 
 // Servidor Express
 const app = express();
@@ -63,20 +64,107 @@ if (fs.existsSync(frontendPath)) {
 }
 
 app.get('/qr', (req, res) => {
-    if (!lastQrCode) return res.send('<h1>Aguardando QR Code...</h1><p>Se o QR Code já foi escaneado, o sistema está pronto.</p>');
+    const statusHtml = `<p style="color: #6366f1; font-weight: bold;">Status Atual: ${whatsappStatus}</p>`;
+    const resetHtml = `<p style="margin-top: 20px;"><a href="/api/whatsapp-reset-page" style="color: #f43f5e; text-decoration: none; font-size: 0.8rem;">🔌 Desconectar e Resetar WhatsApp</a></p>`;
+
+    if (!lastQrCode) {
+        return res.send(`
+            <div style="text-align: center; font-family: sans-serif; padding: 50px; background: #0f172a; color: white; min-height: 100vh;">
+                <h1 style="background: linear-gradient(to right, #6366f1, #f43f5e); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">WhatsApp Status</h1>
+                ${statusHtml}
+                <p>Se o QR Code já foi escaneado, o sistema está pronto.</p>
+                <div style="margin-top: 30px; padding: 20px; border: 1px solid rgba(255,255,255,0.1); display: inline-block; border-radius: 12px;">
+                    <p>Tentando gerar novo QR Code...</p>
+                    <small style="color: gray;">Aguarde alguns segundos ou clique em resetar se estiver travado há muito tempo.</small>
+                </div>
+                ${resetHtml}
+                <script>setTimeout(() => location.reload(), 5000);</script>
+            </div>
+        `);
+    }
 
     QRCode.toDataURL(lastQrCode, (err, url) => {
         if (err) return res.status(500).send('Erro ao gerar imagem do QR Code');
         res.send(`
-            <div style="text-align: center; font-family: sans-serif; padding: 50px;">
-                <h1>Escaneie o WhatsApp</h1>
+            <div style="text-align: center; font-family: sans-serif; padding: 50px; background: #0f172a; color: white; min-height: 100vh;">
+                <h1 style="background: linear-gradient(to right, #6366f1, #f43f5e); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Escaneie o WhatsApp</h1>
+                ${statusHtml}
                 <p>Abra o WhatsApp no celular e escaneie o código abaixo:</p>
-                <img src="${url}" style="width: 300px; border: 10px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.1);" />
+                <div style="background: white; padding: 20px; display: inline-block; border-radius: 12px; box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);">
+                    <img src="${url}" style="width: 300px;" />
+                </div>
                 <p style="color: gray; margin-top: 20px;">O robô enviará os resultados automaticamente quando a extração terminar.</p>
+                ${resetHtml}
                 <script>setTimeout(() => location.reload(), 10000);</script>
             </div>
         `);
     });
+});
+
+app.get('/api/whatsapp-status', (req, res) => {
+    res.json({ status: whatsappStatus, hasQr: !!lastQrCode });
+});
+
+app.get('/api/whatsapp-reset-page', async (req, res) => {
+    res.send(`
+        <div style="text-align: center; font-family: sans-serif; padding: 50px; background: #0f172a; color: white; min-height: 100vh;">
+            <h1 style="color: #f43f5e;">Resetar WhatsApp?</h1>
+            <p>Isso apagará a sessão atual e exigirá um novo login via QR Code.</p>
+            <button onclick="reset()" style="padding: 15px 30px; background: #f43f5e; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">Sim, Confirmar Reset</button>
+            <p><a href="/qr" style="color: gray; text-decoration: none;">Voltar</a></p>
+            <script>
+                async function reset() {
+                    const btn = document.querySelector('button');
+                    btn.disabled = true;
+                    btn.innerText = 'Resetando...';
+                    try {
+                        const res = await fetch('/api/whatsapp-reset', { method: 'POST' });
+                        const data = await res.json();
+                        alert(data.message || 'Reset realizado. O servidor irá reiniciar.');
+                        location.href = '/qr';
+                    } catch (e) {
+                        alert('Erro ao resetar: ' + e.message);
+                        btn.disabled = false;
+                        btn.innerText = 'Sim, Confirmar Reset';
+                    }
+                }
+            </script>
+        </div>
+    `);
+});
+
+app.post('/api/whatsapp-reset', async (req, res) => {
+    try {
+        console.log("♻️ [RESET] Solicitado pelo usuário. Limpando sessão...");
+        whatsappStatus = 'Resetando...';
+
+        // Tenta destruir o cliente de forma limpa
+        try {
+            await client.destroy();
+        } catch (e) {
+            console.log("Erro ao destruir client:", e.message);
+        }
+
+        // Caminho da pasta de autenticação
+        const authPath = path.join(__dirname, '.wwebjs_auth');
+
+        if (fs.existsSync(authPath)) {
+            console.log("🗑️ Removendo pasta .wwebjs_auth...");
+            fs.rmSync(authPath, { recursive: true, force: true });
+        }
+
+        res.json({ success: true, message: "Sessão removida. O servidor vai reiniciar em instantes." });
+
+        // Pequeno delay e sai para o container reiniciar
+        setTimeout(() => {
+            console.log("👋 Saindo para reiniciar container...");
+            process.exit(0);
+        }, 2000);
+
+    } catch (err) {
+        console.error("❌ Erro no reset:", err);
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // Endpoint para disparar o scraper manualmente
@@ -296,30 +384,57 @@ const client = new Client({
     }),
     puppeteer: {
         headless: true,
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
             '--disable-accelerated-2d-canvas',
             '--no-first-run',
-            '--no-zygote'
-        ]
+            '--no-zygote',
+            '--disable-gpu'
+        ],
+        protocolTimeout: 60000
+    },
+    webVersionCache: {
+        type: 'remote',
+        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2413.51-v2.html'
     }
 });
 
 client.on('qr', (qr) => {
     lastQrCode = qr;
+    whatsappStatus = 'Aguardando Escaneamento (QR Code Gerado)';
     console.log('📱 WHATSAPP: Novo QR Code gerado.');
     qrcodeTerminal.generate(qr, { small: true });
 });
 
 client.on('ready', () => {
     lastQrCode = null;
+    whatsappStatus = 'Conectado e Pronto';
     console.log('✅ WHATSAPP: Cliente pronto e conectado!');
 });
 
 client.on('authenticated', () => {
+    whatsappStatus = 'Autenticado (Carregando...)';
     console.log('🔓 WHATSAPP: Autenticado com sucesso!');
+});
+
+client.on('auth_failure', (msg) => {
+    whatsappStatus = 'Falha na Autenticação';
+    lastQrCode = null;
+    console.error('❌ WHATSAPP: Falha na autenticação:', msg);
+});
+
+client.on('disconnected', (reason) => {
+    whatsappStatus = 'Desconectado';
+    lastQrCode = null;
+    console.log('❌ WHATSAPP: Cliente desconectado:', reason);
+    // Tenta re-inicializar
+    setTimeout(() => {
+        console.log('🔄 Tentando re-inicializar WhatsApp...');
+        client.initialize();
+    }, 5000);
 });
 
 client.initialize();
@@ -491,8 +606,9 @@ async function scrape(limit = 50, foundLinks = [], newResults = []) {
     const ignoredLinks = new Set(ignoredListings.map(l => l.get("link").split('?')[0]));
 
     const browser = await chromium.launch({
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
         headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu']
     });
     const context = await browser.newContext({
         userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',

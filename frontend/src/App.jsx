@@ -28,6 +28,7 @@ function App() {
   const [nextRun, setNextRun] = useState('');
   const [search, setSearch] = useState('');
   const [liveStatus, setLiveStatus] = useState({ message: 'Aguardando...', progress: 0, currentItem: null, links: [] });
+  const [whatsappStatus, setWhatsappStatus] = useState({ status: '...', hasQr: false });
   const [showCalendar, setShowCalendar] = useState(false);
   const [limit, setLimit] = useState(3);
   const [limitEnabled, setLimitEnabled] = useState(false);
@@ -38,12 +39,24 @@ function App() {
     fetchListings();
     fetchConfig();
     fetchStatus();
+    fetchWhatsapp();
     const interval = setInterval(() => {
       fetchListings();
       fetchStatus();
+      fetchWhatsapp();
     }, 15000); // Mais frequente para monitoramento
     return () => clearInterval(interval);
   }, [filter]);
+
+  const fetchWhatsapp = async () => {
+    try {
+      const response = await fetch('/api/whatsapp-status');
+      const data = await response.json();
+      setWhatsappStatus(data);
+    } catch (error) {
+      console.error("Error fetching whatsapp status:", error);
+    }
+  };
 
   const fetchStatus = async () => {
     try {
@@ -227,6 +240,29 @@ function App() {
               <Calendar size={14} />
               AGENDADO: {nextRun ? DateTime.fromISO(nextRun).toFormat('dd/MM \'às\' HH:mm') : 'Não agendado'}
             </span>
+
+            <a
+              href="/qr"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 12px',
+                background: whatsappStatus.status.includes('Pronto') ? 'rgba(34, 197, 94, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                borderRadius: '20px',
+                border: `1px solid ${whatsappStatus.status.includes('Pronto') ? 'rgba(34, 197, 94, 0.2)' : 'rgba(245, 158, 11, 0.2)'}`,
+                color: whatsappStatus.status.includes('Pronto') ? '#22c55e' : '#f59e0b',
+                fontWeight: 600,
+                textDecoration: 'none',
+                marginLeft: '10px'
+              }}
+            >
+              <Smartphone size={14} />
+              WHATSAPP: {whatsappStatus.status}
+              {whatsappStatus.hasQr && <span style={{ padding: '2px 6px', background: '#ef4444', color: 'white', borderRadius: '4px', fontSize: '0.6rem', marginLeft: '4px' }}>QR</span>}
+            </a>
           </p>
         </div>
 
