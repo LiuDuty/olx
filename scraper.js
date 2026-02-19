@@ -13,6 +13,9 @@ const http = require('http');
 
 const path = require('path');
 
+// Helper para usar Master Key apenas se ela estiver configurada, evitando erro 500
+const getOptions = () => Parse.hasMasterKey ? { useMasterKey: true } : {};
+
 // Adiciona o plugin de stealth para evitar detecção de robôs
 chromium.use(stealth);
 
@@ -35,7 +38,7 @@ async function updateScraperStatus(message, progress = 0, currentItem = null, li
     try {
         const ScraperStatus = Parse.Object.extend("ScraperStatus");
         const query = new Parse.Query(ScraperStatus);
-        let status = await query.first({ useMasterKey: true });
+        let status = await query.first(getOptions());
         if (!status) status = new ScraperStatus();
 
         status.set("message", message);
@@ -43,7 +46,7 @@ async function updateScraperStatus(message, progress = 0, currentItem = null, li
         status.set("currentItem", currentItem);
         status.set("links", links); // Adiciona a lista de links encontrados
         status.set("lastUpdate", new Date());
-        await status.save(null, { useMasterKey: true });
+        await status.save(null, getOptions());
     } catch (e) {
         console.error("Erro ao atualizar status:", e.message);
     }
@@ -88,10 +91,10 @@ app.post('/api/run-now', async (req, res) => {
             const Config = Parse.Object.extend("Config");
             const query = new Parse.Query(Config);
             query.equalTo("key", "limit_enabled");
-            const limitEnabledObj = await query.first({ useMasterKey: true });
+            const limitEnabledObj = await query.first(getOptions());
 
             if (limitEnabledObj && limitEnabledObj.get("value") === "true") {
-                const limitValObj = await new Parse.Query(Config).equalTo("key", "limit_value").first({ useMasterKey: true });
+                const limitValObj = await new Parse.Query(Config).equalTo("key", "limit_value").first(getOptions());
                 limit = limitValObj ? parseInt(limitValObj.get("value")) : 50;
             } else {
                 limit = 999; // Sem limite prático
@@ -115,7 +118,7 @@ app.post('/api/set-config', async (req, res) => {
         const Config = Parse.Object.extend("Config");
         const query = new Parse.Query(Config);
         query.equalTo("key", key);
-        let config = await query.first({ useMasterKey: true });
+        let config = await query.first(getOptions());
 
         if (!config) {
             config = new Config();
@@ -123,7 +126,7 @@ app.post('/api/set-config', async (req, res) => {
         }
 
         config.set("value", String(value));
-        await config.save(null, { useMasterKey: true });
+        await config.save(null, getOptions());
 
         res.json({ success: true, key, value });
     } catch (err) {
@@ -139,10 +142,10 @@ app.post('/api/set-schedule', async (req, res) => {
         const Config = Parse.Object.extend("Config");
         const query = new Parse.Query(Config);
         query.equalTo("key", "next_run");
-        let config = await query.first({ useMasterKey: true }) || new Config();
+        let config = await query.first(getOptions()) || new Config();
         config.set("key", "next_run");
         config.set("value", nextRun);
-        await config.save(null, { useMasterKey: true });
+        await config.save(null, getOptions());
         res.json({ message: 'Agendamento atualizado', nextRun });
     } catch (err) {
         console.error("❌ Erro na operação API:", err);
@@ -167,7 +170,7 @@ app.get('/api/listings', async (req, res) => {
 
         // Ordena pelos mais recentes capturados primeiro
         query.descending("capturedAt");
-        const results = await query.find({ useMasterKey: true });
+        const results = await query.find(getOptions());
         res.json(results.map(r => r.toJSON()));
     } catch (err) {
         console.error("❌ Erro na operação API:", err);
@@ -180,7 +183,7 @@ app.get('/api/status', async (req, res) => {
     try {
         const ScraperStatus = Parse.Object.extend("ScraperStatus");
         const query = new Parse.Query(ScraperStatus);
-        const status = await query.first({ useMasterKey: true });
+        const status = await query.first(getOptions());
         if (status) {
             res.json(status.toJSON());
         } else {
@@ -198,13 +201,13 @@ app.post('/api/update-listing', async (req, res) => {
     try {
         const Listing = Parse.Object.extend("Listing");
         const query = new Parse.Query(Listing);
-        const listing = await query.get(id, { useMasterKey: true });
+        const listing = await query.get(id, getOptions());
 
         Object.entries(updates).forEach(([key, value]) => {
             listing.set(key, value);
         });
 
-        await listing.save(null, { useMasterKey: true });
+        await listing.save(null, getOptions());
         res.json({ success: true });
     } catch (err) {
         console.error("❌ Erro na operação API:", err);
@@ -218,11 +221,11 @@ app.post('/api/clear-database', async (req, res) => {
         const Listing = Parse.Object.extend("Listing");
         const query = new Parse.Query(Listing);
         query.limit(1000); // Processar em lotes se necessário
-        const allListings = await query.find({ useMasterKey: true });
+        const allListings = await query.find(getOptions());
 
         const count = allListings.length;
         if (count > 0) {
-            await Parse.Object.destroyAll(allListings, { useMasterKey: true });
+            await Parse.Object.destroyAll(allListings, getOptions());
         }
 
         console.log(`🧹 BASE LIMPA: ${count} registros removidos.`);
@@ -238,7 +241,7 @@ app.get('/api/config', async (req, res) => {
     try {
         const Config = Parse.Object.extend("Config");
         const query = new Parse.Query(Config);
-        const configs = await query.find({ useMasterKey: true });
+        const configs = await query.find(getOptions());
         const result = {};
         configs.forEach(c => {
             result[c.get("key")] = c.get("value");
@@ -308,7 +311,7 @@ setInterval(async () => {
     try {
         const Config = Parse.Object.extend("Config");
         const query = new Parse.Query(Config);
-        const configs = await query.find({ useMasterKey: true });
+        const configs = await query.find(getOptions());
 
         const configMap = {};
         configs.forEach(c => configMap[c.get("key")] = c.get("value"));
@@ -327,9 +330,9 @@ setInterval(async () => {
 
                 // Salva o novo agendamento
                 const scheduleQuery = new Parse.Query(Config).equalTo("key", "next_run");
-                let scheduleConfig = await scheduleQuery.first({ useMasterKey: true });
+                let scheduleConfig = await scheduleQuery.first(getOptions());
                 scheduleConfig.set("value", tomorrow07.toISO());
-                await scheduleConfig.save(null, { useMasterKey: true });
+                await scheduleConfig.save(null, getOptions());
 
                 // Determina o limite baseado na config
                 let runLimit = 999;
@@ -347,7 +350,7 @@ setInterval(async () => {
             const newConfig = new Config();
             newConfig.set("key", "next_run");
             newConfig.set("value", defaultRun.toISO());
-            await newConfig.save(null, { useMasterKey: true });
+            await newConfig.save(null, getOptions());
             console.log(`🆕 Agendamento padrão criado para: ${defaultRun.toFormat('dd/MM HH:mm')}`);
         }
     } catch (err) {
@@ -399,7 +402,7 @@ async function saveSingleListing(item) {
         const query = new Parse.Query(Listing);
         // O link normalizado é nossa chave única
         query.equalTo("link", item.link);
-        let listing = await query.first({ useMasterKey: true });
+        let listing = await query.first(getOptions());
 
         const isNew = !listing;
 
@@ -423,7 +426,7 @@ async function saveSingleListing(item) {
             listing.set("capturedAt", new Date()); // Data exata da captura original
         }
 
-        await listing.save(null, { useMasterKey: true });
+        await listing.save(null, getOptions());
         console.log(`✅ ${isNew ? 'NOVO' : 'ATUALIZADO'} no banco: ${item.valor} | ${item.link}`);
         return isNew;
     } catch (e) {
@@ -463,7 +466,7 @@ async function scrape(limit = 50, foundLinks = [], newResults = []) {
     const Listing = Parse.Object.extend("Listing");
     const query = new Parse.Query(Listing);
     query.equalTo("status", "ignored");
-    const ignoredListings = await query.find({ useMasterKey: true });
+    const ignoredListings = await query.find(getOptions());
     // Normalizar links já ignorados para comparação
     const ignoredLinks = new Set(ignoredListings.map(l => l.get("link").split('?')[0]));
 
