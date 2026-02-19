@@ -616,7 +616,9 @@ async function scrape(limit = 50, foundLinks = [], newResults = []) {
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
             '--disable-gpu',
-            '--disable-extensions'
+            '--disable-extensions',
+            '--no-zygote',
+            '--single-process'
         ]
     });
     const context = await browser.newContext({
@@ -624,11 +626,15 @@ async function scrape(limit = 50, foundLinks = [], newResults = []) {
         bypassCSP: true
     });
     const page = await context.newPage();
+    // Bloqueia recursos pesados na página inicial para economizar RAM
+    await page.route('**/*.{png,jpg,jpeg,gif,svg,css,woff,woff2}', route => route.abort());
+
     const initialUrl = 'https://www.olx.com.br/imoveis/venda/estado-sp/sao-paulo-e-regiao/alphaville?ps=1&pe=20000000&sp=6&f=p&o=1';
 
     const allData = [];
     try {
-        await page.goto(initialUrl, { waitUntil: 'load', timeout: 90000 });
+        console.log(`📡 OLX: Navegando para lista inicial...`);
+        await page.goto(initialUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
         const title = await page.title();
         console.log(`📄 Título da página: ${title}`);
