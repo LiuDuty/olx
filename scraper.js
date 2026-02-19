@@ -647,10 +647,19 @@ async function scrape(limit = 50, foundLinks = [], newResults = []) {
 
         const adUrlsResults = await page.evaluate(() => {
             const links = Array.from(document.querySelectorAll('a'));
-            // Captura e normaliza os links (remove query strings)
+            // Captura links que parecem ser de anúncios reais (geralmente terminam com um ID numérico longo)
             const filtered = links
                 .map(a => a.href)
-                .filter(h => h && h.includes('olx.com.br/') && h.includes('/imoveis/') && !h.includes('/venda/') && !h.includes('/aluguel/'))
+                .filter(h => {
+                    if (!h) return false;
+                    const url = h.split('?')[0];
+                    // Deve ser da OLX, de imóveis, e ter um padrão de ID (números no final)
+                    return url.includes('olx.com.br/') &&
+                        url.includes('/imoveis/') &&
+                        /\d{8,}/.test(url) && // Pelo menos 8 dígitos seguidos (o ID)
+                        !url.includes('/venda/') &&
+                        !url.includes('/aluguel/');
+                })
                 .map(h => h.split('?')[0]);
 
             return Array.from(new Set(filtered));
@@ -658,38 +667,39 @@ async function scrape(limit = 50, foundLinks = [], newResults = []) {
 
         console.log(`🔍 OLX Links Filtrados: ${adUrlsResults.length}`);
         const targetUrls = adUrlsResults.filter(link => !ignoredLinks.has(link)).slice(0, limit);
-        console.log(`🎯 OLX: Processando ${targetUrls.length} links (após filtro e limite).`);
+        console.log(`🎯 OLX: Processando ${targetUrls.length} links.`);
 
+        // REUSO DE PÁGINA: Vamos usar a mesma página para economizar RAM no servidor
         let count = 0;
         for (const adUrl of targetUrls) {
             count++;
             const progress = Math.round((count / targetUrls.length) * 80) + 10;
-            const detailPage = await context.newPage();
             try {
                 await updateScraperStatus(`Extraindo anúncio ${count}/${targetUrls.length}`, progress, adUrl, foundLinks);
-                await detailPage.route('**/*.{png,jpg,jpeg,gif,svg,css,woff,woff2}', route => route.abort());
-                await detailPage.goto(adUrl, { waitUntil: 'domcontentloaded', timeout: 40000 });
 
-                const detailTitle = await detailPage.title();
+                // Navega na mesma página para não abrir múltiplos contextos/abas
+                await page.goto(adUrl, { waitUntil: 'domcontentloaded', timeout: 40000 });
+
+                const detailTitle = await page.title();
                 if (detailTitle.includes("Access Denied") || detailTitle.includes("Cloudflare")) {
                     console.error(`🚫 Bloqueio detectado em: ${adUrl}`);
-                    continue; // Pula para o próximo link
+                    continue;
                 }
 
-                const price = await detailPage.evaluate(() => {
+                const price = await page.evaluate(() => {
                     const el = document.querySelector('span[data-testid="ad-price"]') ||
                         document.querySelector('h2.ad-price') ||
                         Array.from(document.querySelectorAll('h2')).find(h => h.innerText.includes('R$'));
                     return el ? el.innerText.trim() : "N/A";
                 });
 
-                const phone = await detailPage.evaluate(() => {
+                const phone = await page.evaluate(() => {
                     const text = document.body.innerText;
                     const match = text.match(/(?:\(?\d{2}\)?\s?)(?:9\s?)?\d{4}[-\s]?\d{4}/);
                     return match ? match[0].trim() : "Não informado";
                 });
 
-                const contactName = await detailPage.evaluate(() => {
+                const contactName = await page.evaluate(() => {
                     const el = document.querySelector('span[data-testid="ad-seller-name"]') ||
                         document.querySelector('div[data-testid="profile-card"] h2') ||
                         document.querySelector('.ad-seller-name');
@@ -713,8 +723,8 @@ async function scrape(limit = 50, foundLinks = [], newResults = []) {
 
             } catch (e) {
                 console.error(`❌ Falha ao extrair ${adUrl}: ${e.message}`);
-            } finally { await detailPage.close(); }
-            await page.waitForTimeout(1000);
+            }
+            await page.waitForTimeout(2000); // Pausa maior para não sobrecarregar
         }
     } catch (err) {
         console.error("❌ Erro durante o scraping:", err.message);
