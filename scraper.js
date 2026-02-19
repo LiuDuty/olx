@@ -50,6 +50,7 @@ const client = new Client({
     }),
     puppeteer: {
         headless: true,
+        executablePath: '/usr/bin/google-chrome-stable', // Tenta o padrão do container ou o do playwright
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
