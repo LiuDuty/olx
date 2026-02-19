@@ -1,40 +1,28 @@
-# Scraper de Imóveis OLX (Barueri - Proprietário Direto)
+# Scraper OLX Barueri + Envio por WhatsApp (Back4App)
 
-Este projeto automatiza a extração de informações de imóveis na OLX para a região de Barueri, filtrando apenas por anúncios de **proprietários particulares**.
+Este projeto automatiza a extração de anúncios da OLX (Proprietários) e envia para o WhatsApp.
 
-## O que ele extrai:
-- **Link do anúncio**
-- **Valor do imóvel**
-- **Telefone do proprietário** (Tenta extrair da descrição ou clicando no botão "Ver número")
+## Como Visualizar o QR Code
 
-## Pré-requisitos
-- [Node.js](https://nodejs.org/) instalado.
-- Navegador Chromium (o script instala automaticamente).
+Ao subir para a **Back4App**, você não precisa depender apenas dos logs do terminal para ver o QR Code.
 
-## Como Instalar e Rodar
+1.  Acesse a **URL Pública** que a Back4App fornece para o seu aplicativo (ex: `https://olx-scraper.back4app.io`).
+2.  O QR Code aparecerá diretamente no seu **navegador**.
+3.  Escaneie com o celular `11-97504-0117`.
+4.  Uma vez conectado, o navegador exibirá uma mensagem de confirmação.
 
-1.  **Instalar dependências:**
-    ```bash
-    npm install
-    ```
+## Configuração Diária
+- O robô roda todos os dias às **09:05**.
+- Ele envia o arquivo `resultados.txt` para o número configurado.
+- A sessão fica salva na pasta `.wwebjs_auth` para evitar novos scaneamentos após reinicializações.
 
-2.  **Garantir que os navegadores do Playwright estão instalados:**
-    ```bash
-    npx playwright install chromium
-    ```
+## Como Rodar Localmente
+```bash
+npm install
+npm start
+```
 
-3.  **Executar o scraper:**
-    ```bash
-    npm start
-    ```
-
-## Observações Importantes (⚠️)
-
-1.  **Bloqueio de Robôs:** A OLX possui proteções robustas. O script utiliza um plugin de "stealth" (furtividade), mas ainda assim você pode encontrar bloqueios ou desafios (CAPTCHAs).
-2.  **Interface Visual:** O script roda com `headless: false`, o que significa que uma janela do navegador irá abrir. **Isso é intencional** para que você possa resolver algum CAPTCHA manualmente se necessário ou fazer login na sua conta OLX caso o site exija para mostrar o telefone.
-3.  **Telefone:** Muitos telefones só são revelados após login. Se o script encontrar muitos como "Requer Login", experimente fazer login manualmente na janela do navegador que se abre no início do processo.
-4.  **Paginação:** O script detecta automaticamente o total de páginas e percorre todas elas até o fim.
-
-## Arquivos Gerados
-- `imoveis_olx.json`: Dados em formato JSON.
-- `imoveis_olx.csv`: Lista pronta para abrir no Excel.
+## Arquivos no Git
+- `scraper.js`: Lógica principal e servidor web para o QR Code.
+- `Dockerfile`: Configuração para rodar na nuvem com todas as dependências do Chrome.
+- `.wwebjs_auth/`: (Ignorado pelo git por segurança) Contém sua sessão logada.
