@@ -13,7 +13,7 @@ chromium.use(stealth);
 // ==========================================
 // CONFIGURAÇÃO
 // ==========================================
-const AGENDAMENTO = '50 9 * * *'; // Todos os dias às 09:50
+const AGENDAMENTO = '10 10 * * *'; // Todos os dias às 10:10
 const TELEFONE_DESTINO = '5511975040117';
 const PORT = process.env.PORT || 3000;
 
