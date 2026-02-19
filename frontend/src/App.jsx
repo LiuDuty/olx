@@ -173,7 +173,8 @@ function App() {
       setShowCalendar(false);
       alert("Agendamento salvo para: " + DateTime.fromISO(nextTime).toFormat('dd/MM HH:mm'));
     } catch (e) {
-      alert("Erro ao atualizar agendamento no servidor");
+      console.error("Erro completo:", e);
+      alert("Erro ao atualizar agendamento: " + e.message);
     }
   };
 
@@ -191,8 +192,9 @@ function App() {
       } else {
         throw new Error(data.error || 'Erro ao limpar');
       }
-    } catch (e) {
-      alert("Erro ao limpar base: " + e.message);
+    } catch (err) {
+      console.error("❌ Erro ao limpar base de dados:", err.message);
+      alert("Erro ao limpar base: " + err.message);
     }
   };
 

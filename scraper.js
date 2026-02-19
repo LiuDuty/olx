@@ -127,6 +127,7 @@ app.post('/api/set-config', async (req, res) => {
 
         res.json({ success: true, key, value });
     } catch (err) {
+        console.error("❌ Erro na operação API:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -144,6 +145,7 @@ app.post('/api/set-schedule', async (req, res) => {
         await config.save(null, { useMasterKey: true });
         res.json({ message: 'Agendamento atualizado', nextRun });
     } catch (err) {
+        console.error("❌ Erro na operação API:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -168,6 +170,7 @@ app.get('/api/listings', async (req, res) => {
         const results = await query.find({ useMasterKey: true });
         res.json(results.map(r => r.toJSON()));
     } catch (err) {
+        console.error("❌ Erro na operação API:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -184,6 +187,7 @@ app.get('/api/status', async (req, res) => {
             res.json({ message: 'Aguardando...', progress: 0 });
         }
     } catch (err) {
+        console.error("❌ Erro na operação API:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -203,6 +207,7 @@ app.post('/api/update-listing', async (req, res) => {
         await listing.save(null, { useMasterKey: true });
         res.json({ success: true });
     } catch (err) {
+        console.error("❌ Erro na operação API:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -240,6 +245,7 @@ app.get('/api/config', async (req, res) => {
         });
         res.json(result);
     } catch (err) {
+        console.error("❌ Erro na operação API:", err);
         res.status(500).json({ error: err.message });
     }
 });
