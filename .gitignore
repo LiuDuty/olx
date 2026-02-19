@@ -1,5 +1,5 @@
 node_modules/
-*.html
+# *.html - removed to allow frontend/index.html
 *.csv
 .env
 npm-debug.log*
