@@ -1,10 +1,12 @@
 {
   "name": "olx",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "OLX Scraper with Back4App integration and React UI",
+  "main": "scraper.js",
   "scripts": {
     "start": "node scraper.js",
+    "build:ui": "cd frontend && npm run build",
+    "dev:ui": "cd frontend && npm run dev",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -19,8 +21,11 @@
   },
   "homepage": "https://github.com/LiuDuty/olx#readme",
   "dependencies": {
+    "dotenv": "^16.4.1",
     "express": "^5.2.1",
+    "luxon": "^3.4.4",
     "node-cron": "^4.2.1",
+    "parse": "^5.1.0",
     "playwright": "^1.58.2",
     "playwright-extra": "^4.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",

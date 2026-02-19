@@ -1,0 +1,125 @@
+/* Calendar Custom Styles */
+.calendar-container {
+  display: flex;
+  justify-content: center;
+}
+
+.custom-calendar {
+  background: rgba(15, 23, 42, 0.8) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 12px !important;
+  color: white !important;
+  width: 100% !important;
+}
+
+.react-calendar__tile {
+  color: white !important;
+}
+
+.react-calendar__tile:enabled:hover,
+.react-calendar__tile:enabled:focus {
+  background-color: var(--primary) !important;
+}
+
+.react-calendar__tile--now {
+  background: var(--accent) !important;
+}
+
+.react-calendar__tile--active {
+  background: var(--primary) !important;
+}
+
+.react-calendar__navigation button {
+  color: white !important;
+}
+
+.react-calendar__navigation button:enabled:hover,
+.react-calendar__navigation button:enabled:focus {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.react-calendar__month-view__weekdays__weekday {
+  color: var(--text-muted) !important;
+}
+
+:root {
+  --primary: #6366f1;
+  --primary-hover: #4f46e5;
+  --bg-dark: #0f172a;
+  --bg-card: rgba(30, 41, 59, 0.7);
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --accent: #f43f5e;
+  --success: #10b981;
+  --glass-border: rgba(255, 255, 255, 0.1);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: 'Outfit', sans-serif;
+}
+
+body {
+  background-color: var(--bg-dark);
+  color: var(--text-main);
+  background-image:
+    radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(244, 63, 94, 0.1) 0, transparent 50%);
+  min-height: 100vh;
+  padding: 20px;
+}
+
+button {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  outline: none;
+}
+
+button:active {
+  transform: scale(0.95);
+}
+
+.glass {
+  background: var(--bg-card);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+}
+
+input,
+textarea {
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 10px;
+  color: white;
+  width: 100%;
+}
+
+input:focus,
+textarea:focus {
+  border-color: var(--primary);
+  outline: none;
+}
+
+/* Scrollbar Custom */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
