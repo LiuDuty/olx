@@ -16,15 +16,13 @@ RUN apt-get update && apt-get install -y \
     libxdamage1 \
     libxext6 \
     libxfixes3 \
-    librandr2 \
+    libxrandr2 \
     libgbm1 \
     libasound2 \
     libpangocairo-1.0-0 \
-    libm12 \
     libxshmfence1 \
     ca-certificates \
     fonts-liberation \
-    libnss3 \
     lsb-release \
     xdg-utils \
     wget \
@@ -37,6 +35,9 @@ COPY package*.json ./
 
 # Instalar dependências do projeto
 RUN npm install
+
+# Instalar navegadores do Playwright
+RUN npx playwright install chromium
 
 # Copiar o resto do código
 COPY . .
