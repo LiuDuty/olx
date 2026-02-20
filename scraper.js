@@ -446,15 +446,39 @@ client.on('disconnected', (reason) => {
     }, 5000);
 });
 
-// Iniciar cliente WhatsApp com lógica de retentativa para Docker/HuggingFace
+// Função para inicializar o WhatsApp com segurança contra erros de rede (DNS)
 async function startWhatsApp() {
-    console.log("🟢 [WhatsApp] Tentando inicializar...");
+    console.log("🟢 [WhatsApp] Iniciando tentativa de conexão...");
+
+    // Captura erros globais temporariamente para o processo não morrer se o Puppeteer falhar internamente
+    const errorHandler = (err) => {
+        if (err.message.includes('ERR_NAME_NOT_RESOLVED') || err.message.includes('Target closed')) {
+            console.error("⚠️ [WhatsApp] Erro de rede/DNS detectado durante boot inicial.");
+            whatsappStatus = 'Erro de Conexão (DNS)';
+        } else {
+            console.error("❌ [WhatsApp] Erro inesperado:", err);
+        }
+    };
+
+    process.once('unhandledRejection', errorHandler);
+    process.once('uncaughtException', errorHandler);
+
     try {
         await client.initialize();
+        console.log("✅ [WhatsApp] Inicialização concluída (Aguardando QR ou Conexão)");
     } catch (err) {
-        console.error("❌ [WhatsApp] Falha:", err.message);
-        console.log("♻️ [WhatsApp] Tentando novamente em 30 segundos...");
-        setTimeout(startWhatsApp, 30000);
+        console.error("❌ [WhatsApp] Falha no try/catch principal:", err.message);
+        whatsappStatus = 'Erro ao carregar';
+
+        // Se falhou, tentamos novamente daqui a 60 segundos
+        console.log("♻️ [WhatsApp] Nova tentativa em 60 segundos...");
+        setTimeout(startWhatsApp, 60000);
+    } finally {
+        // Remove os handlers após a tentativa para não interferir no resto do app
+        setTimeout(() => {
+            process.removeListener('unhandledRejection', errorHandler);
+            process.removeListener('uncaughtException', errorHandler);
+        }, 5000);
     }
 }
 
