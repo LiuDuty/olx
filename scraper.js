@@ -13,6 +13,7 @@ const http = require('http');
 
 const path = require('path');
 const cors = require('cors');
+const { exec } = require('child_process');
 
 // Helper para usar Master Key apenas se ela estiver configurada, evitando erro 500
 const getOptions = () => Parse.hasMasterKey ? { useMasterKey: true } : {};
@@ -387,7 +388,7 @@ app.listen(PORT, '0.0.0.0', () => {
 // Inicialização do WhatsApp Client
 const client = new Client({
     authStrategy: new LocalAuth({
-        dataPath: './.wwebjs_auth'
+        dataPath: './.wwebjs_auth_hf'
     }),
     puppeteer: {
         headless: 'new',
@@ -446,17 +447,37 @@ client.on('disconnected', (reason) => {
     }, 5000);
 });
 
-// Função para inicializar o WhatsApp com segurança contra erros de rede (DNS)
+// Função para inicializar o WhatsApp com segurança contra erros de rede (DNS) e conflitos de porta
 async function startWhatsApp() {
     console.log("🟢 [WhatsApp] Iniciando tentativa de conexão...");
 
-    // Captura erros globais temporariamente para o processo não morrer se o Puppeteer falhar internamente
+    // 1. LIMPEZA AGRESSIVA: Matar qualquer processo de chrome que tenha ficado órfão
+    try {
+        if (process.platform !== 'win32') {
+            exec('pkill -f chromium');
+            console.log("🧹 [Cleanup] Tentando encerrar processos antigos de Chromium...");
+        }
+    } catch (e) { }
+
+    // 2. LIMPEZA DE LOCK FILES: Remover arquivo de trava do puppeteer
+    const lockPath = path.join(__dirname, '.wwebjs_auth_hf', 'SingletonLock');
+    if (fs.existsSync(lockPath)) {
+        try {
+            fs.unlinkSync(lockPath);
+            console.log("🧹 [Cleanup] Arquivo SingletonLock removido.");
+        } catch (e) { }
+    }
+
+    // Captura erros globais temporariamente
     const errorHandler = (err) => {
         if (err.message.includes('ERR_NAME_NOT_RESOLVED') || err.message.includes('Target closed')) {
             console.error("⚠️ [WhatsApp] Erro de rede/DNS detectado durante boot inicial.");
-            whatsappStatus = 'Erro de Conexão (DNS)';
+            whatsappStatus = 'Erro de Rede';
+        } else if (err.message.includes('already running')) {
+            console.error("⚠️ [WhatsApp] Conflito de processo detectado.");
+            whatsappStatus = 'Reiniciando Navegador...';
         } else {
-            console.error("❌ [WhatsApp] Erro inesperado:", err);
+            console.error("❌ [WhatsApp] Erro:", err.message);
         }
     };
 
@@ -465,16 +486,13 @@ async function startWhatsApp() {
 
     try {
         await client.initialize();
-        console.log("✅ [WhatsApp] Inicialização concluída (Aguardando QR ou Conexão)");
+        console.log("✅ [WhatsApp] Inicialização concluída");
     } catch (err) {
-        console.error("❌ [WhatsApp] Falha no try/catch principal:", err.message);
+        console.error("❌ [WhatsApp] Falha:", err.message);
         whatsappStatus = 'Erro ao carregar';
-
-        // Se falhou, tentamos novamente daqui a 60 segundos
-        console.log("♻️ [WhatsApp] Nova tentativa em 60 segundos...");
-        setTimeout(startWhatsApp, 60000);
+        console.log("♻️ [WhatsApp] Nova tentativa em 45 segundos...");
+        setTimeout(startWhatsApp, 45000);
     } finally {
-        // Remove os handlers após a tentativa para não interferir no resto do app
         setTimeout(() => {
             process.removeListener('unhandledRejection', errorHandler);
             process.removeListener('uncaughtException', errorHandler);
