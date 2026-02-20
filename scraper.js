@@ -35,7 +35,22 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.get('/api/health', (req, res) => res.json({ status: 'ok', serverTime: new Date() }));
+// Logger de requisições para debug
+app.use((req, res, next) => {
+    console.log(`📡 [API] ${req.method} ${req.url}`);
+    next();
+});
+
+// Rota de Teste Raiz - Para confirmar que o servidor está Online
+app.get('/', (req, res) => res.send('🚀 OLX Backend Scraper is Online! Use /api/health to check status.'));
+
+// Rota de Saúde
+app.get('/api/health', (req, res) => res.json({
+    status: 'ok',
+    serverTime: new Date(),
+    environment: process.platform,
+    masterKey: !!Parse.hasMasterKey
+}));
 
 // Função para atualizar o status em tempo real no Banco
 async function updateScraperStatus(message, progress = 0, currentItem = null, links = []) {
@@ -57,14 +72,10 @@ async function updateScraperStatus(message, progress = 0, currentItem = null, li
     }
 }
 
-// Serve frontend build if exists
+// Serve frontend build if exists (Manter apenas por segurança, mas no Vercel não será usado)
 const frontendPath = path.join(__dirname, 'frontend', 'dist');
 if (fs.existsSync(frontendPath)) {
     app.use(express.static(frontendPath));
-    // Catch-all route to serve index.html for SPA
-    app.get('/', (req, res) => {
-        res.sendFile(path.join(frontendPath, 'index.html'));
-    });
 }
 
 app.get('/qr', (req, res) => {
