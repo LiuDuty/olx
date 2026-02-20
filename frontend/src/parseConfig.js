@@ -4,8 +4,8 @@ const Parse = window.Parse;
 
 if (Parse) {
     Parse.initialize(
-        "kPphx4UiPzkVLXZbdG6D0ibRi1KQARQ1uMsxWPQr", // App ID
-        "bVidsnN1GWSVGnYnMdHvPBxHw39YDcVMwqr5nQlG"  // JS Key
+        "kj4bCzuM3za0ELbjaOQ49fAatHwcTyXIBlPnrpxO", // App ID
+        "tJIfRz14LRbzIYJL4feqOVrfEVeqS6WjpslkwiQZ"  // JS Key
     );
     Parse.serverURL = 'https://parseapi.back4app.com/';
 } else {

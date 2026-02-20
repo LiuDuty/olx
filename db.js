@@ -7,9 +7,9 @@ const getEnv = (key, fallback) => {
     return (val && val.trim() !== "") ? val : fallback;
 };
 
-const APP_ID = getEnv("PARSE_APP_ID", "kPphx4UiPzkVLXZbdG6D0ibRi1KQARQ1uMsxWPQr");
-const JS_KEY = getEnv("PARSE_JS_KEY", "bVidsnN1GWSVGnYnMdHvPBxHw39YDcVMwqr5nQlG");
-const MASTER_KEY = getEnv("PARSE_MASTER_KEY", getEnv("MASTER_KEY", null));
+const APP_ID = getEnv("PARSE_APP_ID", "kj4bCzuM3za0ELbjaOQ49fAatHwcTyXIBlPnrpxO");
+const JS_KEY = getEnv("PARSE_JS_KEY", "tJIfRz14LRbzIYJL4feqOVrfEVeqS6WjpslkwiQZ");
+const MASTER_KEY = getEnv("PARSE_MASTER_KEY", "iobARSjGrG2LEJPhdW6gc8poa4pZqTIoTmdbaxHR");
 const SERVER_URL = getEnv("PARSE_SERVER_URL", 'https://parseapi.back4app.com');
 
 console.log(`🛠️ [DB] Inicializando... (ID: ${APP_ID.substring(0, 5)}...)`);
