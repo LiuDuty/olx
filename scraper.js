@@ -32,152 +32,144 @@ let whatsappStatus = 'Iniciando...';
 
 // Servidor Express
 const app = express();
+// 1. MIDDLEWARES
 app.use(cors());
 app.use(express.json());
 
-// Logger de requisições para debug
+// Log de requisições detalhado
 app.use((req, res, next) => {
-    console.log(`📡 [API] ${req.method} ${req.url}`);
+    console.log(`📡 [${new Date().toISOString()}] ${req.method} ${req.url}`);
     next();
 });
 
-// Rota de Teste Raiz - Para confirmar que o servidor está Online
-app.get('/', (req, res) => res.send('🚀 OLX Backend Scraper is Online! Use /api/health to check status.'));
+// 2. ROTAS DA API (Sempre no topo)
 
-// Rota de Saúde
+// Check de Saúde e Online
+app.get('/', (req, res) => res.send('🚀 OLX Backend API is Online! Use Vercel for Frontend.'));
+
 app.get('/api/health', (req, res) => res.json({
-    status: 'ok',
+    status: 'API Online',
     serverTime: new Date(),
-    environment: process.platform,
-    masterKey: !!Parse.hasMasterKey
+    whatsapp: whatsappStatus
 }));
 
-// Função para atualizar o status em tempo real no Banco
-async function updateScraperStatus(message, progress = 0, currentItem = null, links = []) {
-    console.log(`📡 STATUS: ${message} (${progress}%)`);
-    try {
-        const ScraperStatus = Parse.Object.extend("ScraperStatus");
-        const query = new Parse.Query(ScraperStatus);
-        let status = await query.first(getOptions());
-        if (!status) status = new ScraperStatus();
-
-        status.set("message", message);
-        status.set("progress", progress);
-        status.set("currentItem", currentItem);
-        status.set("links", links); // Adiciona a lista de links encontrados
-        status.set("lastUpdate", new Date());
-        await status.save(null, getOptions());
-    } catch (e) {
-        console.error("Erro ao atualizar status:", e.message);
-    }
-}
-
-// Serve frontend build if exists (Manter apenas por segurança, mas no Vercel não será usado)
-const frontendPath = path.join(__dirname, 'frontend', 'dist');
-if (fs.existsSync(frontendPath)) {
-    app.use(express.static(frontendPath));
-}
-
-app.get('/qr', (req, res) => {
-    const statusHtml = `<p style="color: #6366f1; font-weight: bold;">Status Atual: ${whatsappStatus}</p>`;
-    const resetHtml = `<p style="margin-top: 20px;"><a href="/api/whatsapp-reset-page" style="color: #f43f5e; text-decoration: none; font-size: 0.8rem;">🔌 Desconectar e Resetar WhatsApp</a></p>`;
-
-    if (!lastQrCode) {
-        return res.send(`
-            <div style="text-align: center; font-family: sans-serif; padding: 50px; background: #0f172a; color: white; min-height: 100vh;">
-                <h1 style="background: linear-gradient(to right, #6366f1, #f43f5e); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">WhatsApp Status</h1>
-                ${statusHtml}
-                <p>Se o QR Code já foi escaneado, o sistema está pronto.</p>
-                <div style="margin-top: 30px; padding: 20px; border: 1px solid rgba(255,255,255,0.1); display: inline-block; border-radius: 12px;">
-                    <p>Tentando gerar novo QR Code...</p>
-                    <small style="color: gray;">Aguarde alguns segundos ou clique em resetar se estiver travado há muito tempo.</small>
-                </div>
-                ${resetHtml}
-                <script>setTimeout(() => location.reload(), 5000);</script>
-            </div>
-        `);
-    }
-
-    QRCode.toDataURL(lastQrCode, (err, url) => {
-        if (err) return res.status(500).send('Erro ao gerar imagem do QR Code');
-        res.send(`
-            <div style="text-align: center; font-family: sans-serif; padding: 50px; background: #0f172a; color: white; min-height: 100vh;">
-                <h1 style="background: linear-gradient(to right, #6366f1, #f43f5e); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Escaneie o WhatsApp</h1>
-                ${statusHtml}
-                <p>Abra o WhatsApp no celular e escaneie o código abaixo:</p>
-                <div style="background: white; padding: 20px; display: inline-block; border-radius: 12px; box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);">
-                    <img src="${url}" style="width: 300px;" />
-                </div>
-                <p style="color: gray; margin-top: 20px;">O robô enviará os resultados automaticamente quando a extração terminar.</p>
-                ${resetHtml}
-                <script>setTimeout(() => location.reload(), 10000);</script>
-            </div>
-        `);
-    });
-});
-
+// Status do WhatsApp e QR Code
 app.get('/api/whatsapp-status', (req, res) => {
     res.json({ status: whatsappStatus, hasQr: !!lastQrCode });
 });
 
-app.get('/api/whatsapp-reset-page', async (req, res) => {
-    res.send(`
-        <div style="text-align: center; font-family: sans-serif; padding: 50px; background: #0f172a; color: white; min-height: 100vh;">
-            <h1 style="color: #f43f5e;">Resetar WhatsApp?</h1>
-            <p>Isso apagará a sessão atual e exigirá um novo login via QR Code.</p>
-            <button onclick="reset()" style="padding: 15px 30px; background: #f43f5e; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">Sim, Confirmar Reset</button>
-            <p><a href="/qr" style="color: gray; text-decoration: none;">Voltar</a></p>
-            <script>
-                async function reset() {
-                    const btn = document.querySelector('button');
-                    btn.disabled = true;
-                    btn.innerText = 'Resetando...';
-                    try {
-                        const res = await fetch('/api/whatsapp-reset', { method: 'POST' });
-                        const data = await res.json();
-                        alert(data.message || 'Reset realizado. O servidor irá reiniciar.');
-                        location.href = '/qr';
-                    } catch (e) {
-                        alert('Erro ao resetar: ' + e.message);
-                        btn.disabled = false;
-                        btn.innerText = 'Sim, Confirmar Reset';
-                    }
-                }
-            </script>
-        </div>
-    `);
+app.get('/api/status', async (req, res) => {
+    try {
+        const ScraperStatus = Parse.Object.extend("ScraperStatus");
+        const query = new Parse.Query(ScraperStatus);
+        const status = await query.first(getOptions());
+        if (status) {
+            res.json(status.toJSON());
+        } else {
+            res.json({ message: 'Aguardando...', progress: 0 });
+        }
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Rotas de Configuração
+app.get('/api/config', async (req, res) => {
+    try {
+        const Config = Parse.Object.extend("Config");
+        const query = new Parse.Query(Config);
+        const configs = await query.find(getOptions());
+        const result = {};
+        configs.forEach(c => result[c.get("key")] = c.get("value"));
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/set-config', async (req, res) => {
+    const { key, value } = req.body;
+    try {
+        const Config = Parse.Object.extend("Config");
+        const query = new Parse.Query(Config);
+        query.equalTo("key", key);
+        let config = await query.first(getOptions()) || new Config();
+        config.set("key", key);
+        config.set("value", String(value));
+        await config.save(null, getOptions());
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Listagens e Operações
+app.get('/api/listings', async (req, res) => {
+    const { filter } = req.query;
+    try {
+        const Listing = Parse.Object.extend("Listing");
+        const query = new Parse.Query(Listing);
+        if (filter === 'favorites') query.equalTo("isFavorite", true);
+        else if (filter === 'ignored') query.equalTo("status", "ignored");
+        else query.equalTo("status", "active");
+        query.descending("capturedAt");
+        const results = await query.find(getOptions());
+        res.json(results.map(r => r.toJSON()));
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/run-now', async (req, res) => {
+    if (isScraping) return res.status(400).json({ error: 'Scraper já está rodando' });
+    const limit = req.body.limit || 50;
+    ejetaScraper(limit);
+    res.json({ message: `Iniciado com limite de ${limit}` });
+});
+
+// WhatsApp Page (Para o QR Code inicial ser visível se necessário)
+app.get('/qr', (req, res) => {
+    if (!lastQrCode) return res.send(`<h2>Status: ${whatsappStatus}</h2><p>Aguardando QR Code...</p><script>setTimeout(()=>location.reload(), 5000)</script>`);
+    QRCode.toDataURL(lastQrCode, (err, url) => {
+        res.send(`<div style="text-align:center"><h1>Escaneie o WhatsApp</h1><img src="${url}" /><p>${whatsappStatus}</p></div><script>setTimeout(()=>location.reload(), 10000)</script>`);
+    });
+});
+
+// Resto das rotas (reset, update, etc)...
+app.post('/api/update-listing', async (req, res) => {
+    const { id, updates } = req.body;
+    try {
+        const Listing = Parse.Object.extend("Listing");
+        const query = new Parse.Query(Listing);
+        const listing = await query.get(id, getOptions());
+        Object.entries(updates).forEach(([key, value]) => listing.set(key, value));
+        await listing.save(null, getOptions());
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/clear-database', async (req, res) => {
+    try {
+        const Listing = Parse.Object.extend("Listing");
+        const query = new Parse.Query(Listing);
+        const results = await query.find(getOptions());
+        if (results.length > 0) await Parse.Object.destroyAll(results, getOptions());
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 app.post('/api/whatsapp-reset', async (req, res) => {
     try {
-        console.log("♻️ [RESET] Solicitado pelo usuário. Limpando sessão...");
-        whatsappStatus = 'Resetando...';
-
-        // Tenta destruir o cliente de forma limpa
-        try {
-            await client.destroy();
-        } catch (e) {
-            console.log("Erro ao destruir client:", e.message);
-        }
-
-        // Caminho da pasta de autenticação
+        await client.destroy();
         const authPath = path.join(__dirname, '.wwebjs_auth');
-
-        if (fs.existsSync(authPath)) {
-            console.log("🗑️ Removendo pasta .wwebjs_auth...");
-            fs.rmSync(authPath, { recursive: true, force: true });
-        }
-
-        res.json({ success: true, message: "Sessão removida. O servidor vai reiniciar em instantes." });
-
-        // Pequeno delay e sai para o container reiniciar
-        setTimeout(() => {
-            console.log("👋 Saindo para reiniciar container...");
-            process.exit(0);
-        }, 2000);
-
+        if (fs.existsSync(authPath)) fs.rmSync(authPath, { recursive: true, force: true });
+        res.json({ success: true });
+        setTimeout(() => process.exit(0), 1000);
     } catch (err) {
-        console.error("❌ Erro no reset:", err);
         res.status(500).json({ error: err.message });
     }
 });
