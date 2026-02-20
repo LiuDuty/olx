@@ -674,57 +674,68 @@ async function scrape(limit = 50, foundLinks = [], newResults = []) {
         for (const adUrl of targetUrls) {
             count++;
             const progress = Math.round((count / targetUrls.length) * 80) + 10;
-            try {
-                await updateScraperStatus(`Extraindo anúncio ${count}/${targetUrls.length}`, progress, adUrl, foundLinks);
 
-                // Navega na mesma página para não abrir múltiplos contextos/abas
-                await page.goto(adUrl, { waitUntil: 'domcontentloaded', timeout: 40000 });
+            // Lógica de Retentativa para cada anúncio
+            let retryCount = 0;
+            const maxRetries = 2;
+            let success = false;
 
-                const detailTitle = await page.title();
-                if (detailTitle.includes("Access Denied") || detailTitle.includes("Cloudflare")) {
-                    console.error(`🚫 Bloqueio detectado em: ${adUrl}`);
-                    continue;
+            while (retryCount <= maxRetries && !success) {
+                try {
+                    await updateScraperStatus(`Extraindo anúncio ${count}/${targetUrls.length}${retryCount > 0 ? ` (Tentativa ${retryCount + 1})` : ''}`, progress, adUrl, foundLinks);
+
+                    // Navega na mesma página
+                    await page.goto(adUrl, { waitUntil: 'domcontentloaded', timeout: 50000 });
+
+                    const detailTitle = await page.title();
+                    if (detailTitle.includes("Access Denied") || detailTitle.includes("Cloudflare")) {
+                        console.error(`🚫 Bloqueio detectado em: ${adUrl}`);
+                        break; // Se for bloqueio, não adianta tentar de novo
+                    }
+
+                    const data = await page.evaluate(() => {
+                        const priceEl = document.querySelector('span[data-testid="ad-price"]') ||
+                            document.querySelector('h2.ad-price') ||
+                            Array.from(document.querySelectorAll('h2')).find(h => h.innerText.includes('R$'));
+
+                        const phoneMatch = document.body.innerText.match(/(?:\(?\d{2}\)?\s?)(?:9\s?)?\d{4}[-\s]?\d{4}/);
+
+                        const sellerEl = document.querySelector('span[data-testid="ad-seller-name"]') ||
+                            document.querySelector('div[data-testid="profile-card"] h2') ||
+                            document.querySelector('.ad-seller-name');
+
+                        return {
+                            price: priceEl ? priceEl.innerText.trim() : "N/A",
+                            phone: phoneMatch ? phoneMatch[0].trim() : "Não informado",
+                            contactName: sellerEl ? sellerEl.innerText.trim() : "Desconhecido"
+                        };
+                    });
+
+                    console.log(`💎 Extraído: ${data.price} | Fone: ${data.phone}`);
+
+                    const scrapedItem = { link: adUrl, valor: data.price, telefone: data.phone, contactName: data.contactName };
+                    allData.push(scrapedItem);
+                    foundLinks.push(adUrl);
+
+                    const isNewEntry = await saveSingleListing(scrapedItem);
+                    if (isNewEntry) {
+                        newResults.push(scrapedItem);
+                    }
+
+                    await updateScraperStatus(`Encontrado: ${data.price}`, progress, adUrl, foundLinks);
+                    success = true;
+
+                } catch (e) {
+                    retryCount++;
+                    console.error(`⚠️ Erro na tentativa ${retryCount} para ${adUrl}: ${e.message}`);
+                    if (retryCount > maxRetries) {
+                        console.error(`❌ Desistindo de ${adUrl} após ${maxRetries} tentativas.`);
+                    } else {
+                        await page.waitForTimeout(3000); // Espera um pouco antes de tentar de novo
+                    }
                 }
-
-                const price = await page.evaluate(() => {
-                    const el = document.querySelector('span[data-testid="ad-price"]') ||
-                        document.querySelector('h2.ad-price') ||
-                        Array.from(document.querySelectorAll('h2')).find(h => h.innerText.includes('R$'));
-                    return el ? el.innerText.trim() : "N/A";
-                });
-
-                const phone = await page.evaluate(() => {
-                    const text = document.body.innerText;
-                    const match = text.match(/(?:\(?\d{2}\)?\s?)(?:9\s?)?\d{4}[-\s]?\d{4}/);
-                    return match ? match[0].trim() : "Não informado";
-                });
-
-                const contactName = await page.evaluate(() => {
-                    const el = document.querySelector('span[data-testid="ad-seller-name"]') ||
-                        document.querySelector('div[data-testid="profile-card"] h2') ||
-                        document.querySelector('.ad-seller-name');
-                    return el ? el.innerText.trim() : "Desconhecido";
-                });
-
-                console.log(`💎 Extraído: ${price} | Fone: ${phone} | Nome: ${contactName}`);
-
-                const scrapedItem = { link: adUrl, valor: price, telefone: phone, contactName: contactName };
-                allData.push(scrapedItem);
-                foundLinks.push(adUrl); // Adiciona à lista de monitoramento
-
-                // Salva imediatamente no banco de dados e verifica se é novo!
-                const isNewEntry = await saveSingleListing(scrapedItem);
-                if (isNewEntry) {
-                    newResults.push(scrapedItem);
-                }
-
-                // Atualiza status com a lista de links atualizada
-                await updateScraperStatus(`Encontrado: ${price}`, progress, adUrl, foundLinks);
-
-            } catch (e) {
-                console.error(`❌ Falha ao extrair ${adUrl}: ${e.message}`);
             }
-            await page.waitForTimeout(2000); // Pausa maior para não sobrecarregar
+            await page.waitForTimeout(2000); // Pausa entre anúncios
         }
     } catch (err) {
         console.error("❌ Erro durante o scraping:", err.message);
