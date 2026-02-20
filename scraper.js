@@ -35,6 +35,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.get('/api/health', (req, res) => res.json({ status: 'ok', serverTime: new Date() }));
+
 // Função para atualizar o status em tempo real no Banco
 async function updateScraperStatus(message, progress = 0, currentItem = null, links = []) {
     console.log(`📡 STATUS: ${message} (${progress}%)`);

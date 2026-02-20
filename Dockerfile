@@ -57,12 +57,6 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
-# Copiar e buildar o frontend
-COPY frontend/package*.json ./frontend/
-RUN cd frontend && npm install
-COPY frontend/ ./frontend/
-RUN cd frontend && npm run build
-
 # Copiar o resto do código do backend
 COPY . .
 
