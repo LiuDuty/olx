@@ -451,6 +451,33 @@ client.on('disconnected', (reason) => {
 async function startWhatsApp() {
     console.log("🟢 [WhatsApp] Iniciando tentativa de conexão...");
 
+    // 1. LIMPEZA DE LOCK FILES: Remover arquivos de trava que impedem o boot
+    try {
+        const sessionPath = path.join(__dirname, '.wwebjs_auth_hf', 'session');
+        const lockFile = path.join(sessionPath, 'SingletonLock');
+
+        if (fs.existsSync(lockFile)) {
+            console.log("🧹 [Cleanup] Removendo SingletonLock...");
+            fs.unlinkSync(lockFile);
+        }
+
+        // Também remover links simbólicos se existirem (comum em Docker)
+        const lockLink = path.join(sessionPath, 'SingletonCookie');
+        if (fs.existsSync(lockLink)) {
+            fs.unlinkSync(lockLink);
+        }
+    } catch (e) {
+        console.log("⚠️ [Cleanup] Erro ao limpar locks:", e.message);
+    }
+
+    // 2. MATAR PROCESSOS ÓRFÃOS (Apenas Linux)
+    if (process.platform !== 'win32') {
+        try {
+            exec('pkill -f chromium || true');
+            console.log("🧹 [Cleanup] Tentando encerrar processos antigos de Chromium...");
+        } catch (e) { }
+    }
+
     // Captura erros globais temporariamente
     const errorHandler = (err) => {
         if (err.message.includes('ERR_NAME_NOT_RESOLVED') || err.message.includes('Target closed')) {
