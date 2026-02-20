@@ -13,6 +13,10 @@ const http = require('http');
 
 const path = require('path');
 const cors = require('cors');
+
+console.log('🚀 [Boot] O script scraper.js começou a rodar!');
+console.log('📅 [Boot] Hora Atual:', new Date().toISOString());
+console.log('🏠 [Boot] Diretório:', __dirname);
 const { exec } = require('child_process');
 
 // Helper para usar Master Key apenas se ela estiver configurada, evitando erro 500
@@ -398,11 +402,11 @@ const client = new Client({
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
             '--disable-gpu',
+            '--no-first-run',
             '--no-zygote',
-            '--single-process',
             '--disable-extensions',
-            '--disable-software-rasterizer',
-            '--js-flags="--max-old-space-size=400"'
+            '--hide-scrollbars',
+            '--mute-audio'
         ],
         protocolTimeout: 600000
     },
