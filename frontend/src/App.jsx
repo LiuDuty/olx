@@ -48,9 +48,11 @@ function App() {
     return () => clearInterval(interval);
   }, [filter]);
 
+  const API_BASE_URL = 'https://olx-12ntim1b.b4a.run';
+
   const fetchWhatsapp = async () => {
     try {
-      const response = await fetch('/api/whatsapp-status');
+      const response = await fetch(`${API_BASE_URL}/api/whatsapp-status`);
       const data = await response.json();
       setWhatsappStatus(data);
     } catch (error) {
@@ -60,7 +62,7 @@ function App() {
 
   const fetchStatus = async () => {
     try {
-      const response = await fetch('/api/status');
+      const response = await fetch(`${API_BASE_URL}/api/status`);
       const data = await response.json();
       if (data) {
         setLiveStatus({
@@ -83,7 +85,7 @@ function App() {
 
   const fetchListings = async () => {
     try {
-      const response = await fetch(`/api/listings?filter=${filter}`);
+      const response = await fetch(`${API_BASE_URL}/api/listings?filter=${filter}`);
       const results = await response.json();
 
       // Mapear os dados para o formato esperado (Parse Object like)
@@ -102,7 +104,7 @@ function App() {
 
   const fetchConfig = async () => {
     try {
-      const response = await fetch('/api/config');
+      const response = await fetch(`${API_BASE_URL}/api/config`);
       const data = await response.json();
       if (data) {
         if (data.next_run) setNextRun(data.next_run);
@@ -116,7 +118,7 @@ function App() {
 
   const saveConfig = async (key, value) => {
     try {
-      await fetch('/api/set-config', {
+      await fetch(`${API_BASE_URL}/api/set-config`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key, value })
@@ -128,7 +130,7 @@ function App() {
 
   const handleUpdateListing = async (listing, updates) => {
     try {
-      const response = await fetch('/api/update-listing', {
+      const response = await fetch(`${API_BASE_URL}/api/update-listing`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: listing.id, updates })
@@ -146,7 +148,7 @@ function App() {
     setIsScraping(true);
     try {
       const runLimit = limitEnabled ? parseInt(limit) : 999;
-      const response = await fetch('/api/run-now', {
+      const response = await fetch(`${API_BASE_URL}/api/run-now`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ limit: runLimit })
@@ -174,7 +176,7 @@ function App() {
     }).toISO();
 
     try {
-      const response = await fetch('/api/set-schedule', {
+      const response = await fetch(`${API_BASE_URL}/api/set-schedule`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nextRun: nextTime })
@@ -197,7 +199,7 @@ function App() {
     }
 
     try {
-      const response = await fetch('/api/clear-database', { method: 'POST' });
+      const response = await fetch(`${API_BASE_URL}/api/clear-database`, { method: 'POST' });
       const data = await response.json();
       if (response.ok) {
         alert(`Base limpa com sucesso! ${data.count} registros removidos.`);
@@ -242,7 +244,7 @@ function App() {
             </span>
 
             <a
-              href="/qr"
+              href={`${API_BASE_URL}/qr`}
               target="_blank"
               rel="noopener noreferrer"
               style={{

@@ -12,6 +12,7 @@ const https = require('https');
 const http = require('http');
 
 const path = require('path');
+const cors = require('cors');
 
 // Helper para usar Master Key apenas se ela estiver configurada, evitando erro 500
 const getOptions = () => Parse.hasMasterKey ? { useMasterKey: true } : {};
@@ -31,6 +32,7 @@ let whatsappStatus = 'Iniciando...';
 
 // Servidor Express
 const app = express();
+app.use(cors());
 app.use(express.json());
 
 // Função para atualizar o status em tempo real no Banco
