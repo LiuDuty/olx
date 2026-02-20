@@ -503,6 +503,26 @@ setInterval(async () => {
     }
 }, 60000); // 1 minuto
 
+// Função para atualizar o status em tempo real no Banco
+async function updateScraperStatus(message, progress = 0, currentItem = null, links = []) {
+    console.log(`📡 STATUS: ${message} (${progress}%)`);
+    try {
+        const ScraperStatus = Parse.Object.extend("ScraperStatus");
+        const query = new Parse.Query(ScraperStatus);
+        let status = await query.first(getOptions());
+        if (!status) status = new ScraperStatus();
+
+        status.set("message", message);
+        status.set("progress", progress);
+        status.set("currentItem", currentItem);
+        status.set("links", links);
+        status.set("lastUpdate", new Date());
+        await status.save(null, getOptions());
+    } catch (e) {
+        console.error("Erro ao atualizar status:", e.message);
+    }
+}
+
 async function ejetaScraper(limit = 50) {
     if (isScraping) return;
     isScraping = true;
