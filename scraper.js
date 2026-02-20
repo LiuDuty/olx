@@ -24,7 +24,7 @@ chromium.use(stealth);
 // CONFIGURAÇÃO
 // ==========================================
 const TELEFONE_DESTINO = process.env.TELEFONE_DESTINO || '5511975040117';
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 7860;
 
 let lastQrCode = null;
 let isScraping = false;
@@ -390,21 +390,20 @@ const client = new Client({
         dataPath: './.wwebjs_auth'
     }),
     puppeteer: {
-        headless: process.env.HEADLESS === 'false' ? false : true,
+        headless: 'new',
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || (process.platform === 'win32' ? null : '/usr/bin/chromium'),
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
             '--disable-gpu',
+            '--no-zygote',
+            '--single-process',
             '--disable-extensions',
-            '--font-render-hinting=none',
-            '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+            '--disable-software-rasterizer',
+            '--js-flags="--max-old-space-size=400"'
         ],
-        protocolTimeout: 600000 // 10 minutos de timeout
+        protocolTimeout: 600000
     },
     webVersionCache: {
         type: 'remote',
@@ -637,15 +636,14 @@ async function scrape(limit = 50, foundLinks = [], newResults = []) {
 
     const browser = await chromium.launch({
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || (process.platform === 'win32' ? null : '/usr/bin/chromium'),
-        headless: process.env.HEADLESS === 'false' ? false : true,
+        headless: true,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--disable-extensions',
             '--no-zygote',
-            '--single-process'
+            '--single-process',
+            '--js-flags="--max-old-space-size=400"'
         ]
     });
     const context = await browser.newContext({

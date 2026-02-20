@@ -60,8 +60,8 @@ RUN npm install
 # Copiar o resto do código do backend
 COPY . .
 
-# Expor a porta 3000
-EXPOSE 3000
+# Expor a porta 7860 (Padrão Hugging Face)
+EXPOSE 7860
 
 # Comando para iniciar (roda o node scraper.js)
 CMD ["npm", "start"]
