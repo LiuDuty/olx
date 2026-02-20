@@ -451,23 +451,6 @@ client.on('disconnected', (reason) => {
 async function startWhatsApp() {
     console.log("🟢 [WhatsApp] Iniciando tentativa de conexão...");
 
-    // 1. LIMPEZA AGRESSIVA: Matar qualquer processo de chrome que tenha ficado órfão
-    try {
-        if (process.platform !== 'win32') {
-            exec('pkill -f chromium');
-            console.log("🧹 [Cleanup] Tentando encerrar processos antigos de Chromium...");
-        }
-    } catch (e) { }
-
-    // 2. LIMPEZA DE LOCK FILES: Remover arquivo de trava do puppeteer
-    const lockPath = path.join(__dirname, '.wwebjs_auth_hf', 'SingletonLock');
-    if (fs.existsSync(lockPath)) {
-        try {
-            fs.unlinkSync(lockPath);
-            console.log("🧹 [Cleanup] Arquivo SingletonLock removido.");
-        } catch (e) { }
-    }
-
     // Captura erros globais temporariamente
     const errorHandler = (err) => {
         if (err.message.includes('ERR_NAME_NOT_RESOLVED') || err.message.includes('Target closed')) {

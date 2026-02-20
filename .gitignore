@@ -10,3 +10,4 @@ yarn-error.log*
 .wwebjs_cache/
 dist/
 frontend/dist/
+.wwebjs_auth_hf/

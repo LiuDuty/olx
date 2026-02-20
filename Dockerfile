@@ -44,6 +44,7 @@ RUN apt-get update && apt-get install -y \
     libdrm2 \
     libxkbcommon0 \
     libxshmfence1 \
+    procps \
     && rm -rf /var/lib/apt/lists/*
 
 # Definir variáveis de ambiente para Puppeteer e Playwright
@@ -51,17 +52,23 @@ ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 ENV PLAYWRIGHT_BROWSERS_PATH=0
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
-WORKDIR /app
+# Criar usuário 1000 (Padrão Hugging Face)
+RUN useradd -m -u 1000 user
+USER user
+ENV HOME=/home/user \
+    PATH=/home/user/.local/bin:$PATH
 
-# Copiar arquivos de dependências do backend
-COPY package*.json ./
+WORKDIR $HOME/app
+
+# Copiar arquivos de dependências e instalar
+COPY --chown=user:user package*.json ./
 RUN npm install
 
-# Copiar o resto do código do backend
-COPY . .
+# Copiar o resto do código
+COPY --chown=user:user . .
 
-# Expor a porta 7860 (Padrão Hugging Face)
+# Expor a porta 7860
 EXPOSE 7860
 
-# Comando para iniciar (roda o node scraper.js)
+# Comando para iniciar
 CMD ["npm", "start"]
