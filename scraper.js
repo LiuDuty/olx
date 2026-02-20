@@ -446,7 +446,20 @@ client.on('disconnected', (reason) => {
     }, 5000);
 });
 
-client.initialize();
+// Iniciar cliente WhatsApp com lógica de retentativa para Docker/HuggingFace
+async function startWhatsApp() {
+    console.log("🟢 [WhatsApp] Tentando inicializar...");
+    try {
+        await client.initialize();
+    } catch (err) {
+        console.error("❌ [WhatsApp] Falha:", err.message);
+        console.log("♻️ [WhatsApp] Tentando novamente em 30 segundos...");
+        setTimeout(startWhatsApp, 30000);
+    }
+}
+
+startWhatsApp();
+
 
 // Loop de Verificação de Agendamento (roda a cada minuto)
 setInterval(async () => {
