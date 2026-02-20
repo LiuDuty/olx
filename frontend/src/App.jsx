@@ -48,7 +48,7 @@ function App() {
     return () => clearInterval(interval);
   }, [filter]);
 
-  const API_BASE_URL = 'https://olxweb-v5ygah5r.b4a.run';
+  const API_BASE_URL = 'https://liuduty-olx-robot.hf.space';
 
   const fetchWhatsapp = async () => {
     try {
