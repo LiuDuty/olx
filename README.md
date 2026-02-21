@@ -1,3 +1,12 @@
+---
+title: OLX Robot
+emoji: 🤖
+colorFrom: green
+colorTo: blue
+sdk: docker
+pinned: false
+---
+
 # OLX Scraper Pro 🚀
 
 Sistema avançado de extração e gestão de imóveis do OLX com integração Back4App (MongoDB) e Interface Web Moderna.
