@@ -133,11 +133,28 @@ app.post('/api/run-now', async (req, res) => {
     res.json({ message: `Iniciado com limite de ${limit}` });
 });
 
-// WhatsApp Page (Para o QR Code inicial ser visível se necessário)
+// WhatsApp Page (QR Code Simples e Direto)
 app.get('/qr', (req, res) => {
-    if (!lastQrCode) return res.send(`<h2>Status: ${whatsappStatus}</h2><p>Aguardando QR Code...</p><script>setTimeout(()=>location.reload(), 5000)</script>`);
-    QRCode.toDataURL(lastQrCode, (err, url) => {
-        res.send(`<div style="text-align:center"><h1>Escaneie o WhatsApp</h1><img src="${url}" /><p>${whatsappStatus}</p></div><script>setTimeout(()=>location.reload(), 10000)</script>`);
+    if (!lastQrCode) return res.send(`
+        <div style="text-align:center; padding: 50px; font-family: Arial; background: #fff;">
+            <h2>🤖 Status: ${whatsappStatus}</h2>
+            <p>Gerando QR Code... Aguarde alguns segundos.</p>
+            <script>setTimeout(()=>location.reload(), 3000)</script>
+        </div>
+    `);
+
+    QRCode.toDataURL(lastQrCode, { margin: 1, scale: 8 }, (err, url) => {
+        res.send(`
+            <div style="text-align:center; padding: 20px; font-family: Arial; background: #fff;">
+                <h1 style="color: #25D366;">Escaneie o WhatsApp</h1>
+                <div style="border: 10px solid #f0f0f0; display: inline-block; padding: 10px; border-radius: 10px;">
+                    <img src="${url}" style="width: 350px; height: 350px;"/>
+                </div>
+                <p style="font-size: 1.2em; margin-top: 20px;">Status: <b>${whatsappStatus}</b></p>
+                <p style="color: #666;">A página atualiza sozinha a cada 30s.</p>
+                <script>setTimeout(()=>location.reload(), 30000)</script>
+            </div>
+        `);
     });
 });
 
@@ -377,17 +394,16 @@ app.get('/api/config', async (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🌐 Servidor Web ativo na porta ${PORT}`);
 
-    // Inicia o auto-ping para evitar que o container durma
-    const APP_URL = process.env.APP_URL || 'https://olx-12ntim1b.b4a.run';
+    // Inicia o auto-ping para o próprio endereço do Hugging Face para não dormir
+    const HF_URL = `https://liuduty-olx-robot.hf.space`;
     setInterval(() => {
-        console.log(`📡 [Keep-Alive] Pinging ${APP_URL}...`);
-        const protocol = APP_URL.startsWith('https') ? https : http;
-        protocol.get(APP_URL, (res) => {
-            console.log(`✅ [Keep-Alive] Status: ${res.statusCode}`);
+        console.log(`📡 [Keep-Alive] Ativando servidor...`);
+        https.get(HF_URL, (res) => {
+            // Silencioso
         }).on('error', (err) => {
             console.error(`❌ [Keep-Alive] Erro: ${err.message}`);
         });
-    }, 10 * 60 * 1000); // A cada 10 minutos
+    }, 5 * 60 * 1000); // A cada 5 minutos
 });
 
 // Token do Browserless
@@ -412,14 +428,14 @@ const client = new Client({
     },
     webVersionCache: {
         type: 'remote',
-        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1012170943-alpha.html'
+        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1018.526-alpha.html'
     }
 });
 
 client.on('qr', (qr) => {
     lastQrCode = qr;
-    whatsappStatus = 'Aguardando Escaneamento (QR Code Gerado)';
-    console.log('📱 WHATSAPP: Novo QR Code gerado.');
+    whatsappStatus = 'Aguardando Scan';
+    console.log('📱 WHATSAPP: QR Code Gerado. Acesse /qr para escanear.');
     qrcodeTerminal.generate(qr, { small: true });
 });
 
@@ -455,18 +471,18 @@ client.on('disconnected', (reason) => {
 async function startWhatsApp() {
     console.log("🟢 [WhatsApp] Iniciando tentativa de conexão...");
 
-    // 1. LIMPEZA DE TRAVAS (Locks)
+    // 1. LIMPEZA TOTAL DE SESSÃO (Para evitar LOGOUT loop)
     try {
         const rootAuthPath = path.join(__dirname, '.wwebjs_auth_hf');
         if (fs.existsSync(rootAuthPath)) {
-            const files = fs.readdirSync(rootAuthPath, { recursive: true });
-            files.forEach(file => {
-                if (file.includes('SingletonLock')) {
-                    fs.unlinkSync(path.join(rootAuthPath, file));
-                }
-            });
+            console.log("🧹 [Cleanup] Limpando pasta de autenticação para nova conexão...");
+            fs.rmSync(rootAuthPath, { recursive: true, force: true });
         }
-    } catch (e) { }
+        // Recria a pasta limpa
+        fs.mkdirSync(rootAuthPath, { recursive: true });
+    } catch (e) {
+        console.log("⚠️ [Cleanup] Erro na limpeza:", e.message);
+    }
 
     // 2. MATAR PROCESSOS ANTIGOS
     if (process.platform !== 'win32') {
