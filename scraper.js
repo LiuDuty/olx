@@ -625,9 +625,9 @@ async function scrape(limit = 50, foundLinks = [], newResults = []) {
     } catch (err) {
         console.error("❌ Erro durante o scraping:", err.message);
     } finally {
-        // IMPORTANTE: usar disconnect() e não close()
-        // close() mata o browser remoto, derrubando também o WhatsApp
-        await browser.disconnect();
+        // Fecha apenas o contexto (abas, cookies), não o browser remoto
+        // Isso evita derrubar a sessão do WhatsApp que usa o mesmo Browserless
+        try { await context.close(); } catch (e) { console.log('Context close:', e.message); }
     }
     return allData;
 }
