@@ -10,6 +10,7 @@ const Parse = require('./db');
 const { DateTime } = require('luxon');
 const https = require('https');
 const http = require('http');
+const dns = require('dns');
 
 const path = require('path');
 const cors = require('cors');
@@ -29,7 +30,7 @@ chromium.use(stealth);
 // CONFIGURAÇÃO
 // ==========================================
 const TELEFONE_DESTINO = process.env.TELEFONE_DESTINO || '5511975040117';
-const PORT = process.env.PORT || 7860;
+const PORT = process.env.PORT || 8080;
 
 let lastQrCode = null;
 let isScraping = false;
@@ -389,24 +390,23 @@ app.listen(PORT, '0.0.0.0', () => {
     }, 10 * 60 * 1000); // A cada 10 minutos
 });
 
+// Token do Browserless
+const BROWSERLESS_TOKEN = process.env.BROWSERLESS_TOKEN || '2U1KDYckXbPO4pc065f0e047f92f67e4ab2dbe8e65ac0fd55';
+const BROWSERLESS_WS = `wss://chrome.browserless.io?token=${BROWSERLESS_TOKEN}`;
+
 // Inicialização do WhatsApp Client
 const client = new Client({
     authStrategy: new LocalAuth({
         dataPath: './.wwebjs_auth_hf'
     }),
     puppeteer: {
+        browserWSEndpoint: BROWSERLESS_WS,
         headless: 'new',
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || (process.platform === 'win32' ? null : '/usr/bin/chromium'),
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--no-first-run',
-            '--no-zygote',
-            '--disable-extensions',
-            '--hide-scrollbars',
-            '--mute-audio'
+            '--disable-gpu'
         ],
         protocolTimeout: 600000
     },
@@ -455,31 +455,22 @@ client.on('disconnected', (reason) => {
 async function startWhatsApp() {
     console.log("🟢 [WhatsApp] Iniciando tentativa de conexão...");
 
-    // 1. LIMPEZA DE LOCK FILES: Remover arquivos de trava que impedem o boot
+    // 1. LIMPEZA DE TRAVAS (Locks)
     try {
-        const sessionPath = path.join(__dirname, '.wwebjs_auth_hf', 'session');
-        const lockFile = path.join(sessionPath, 'SingletonLock');
-
-        if (fs.existsSync(lockFile)) {
-            console.log("🧹 [Cleanup] Removendo SingletonLock...");
-            fs.unlinkSync(lockFile);
+        const rootAuthPath = path.join(__dirname, '.wwebjs_auth_hf');
+        if (fs.existsSync(rootAuthPath)) {
+            const files = fs.readdirSync(rootAuthPath, { recursive: true });
+            files.forEach(file => {
+                if (file.includes('SingletonLock')) {
+                    fs.unlinkSync(path.join(rootAuthPath, file));
+                }
+            });
         }
+    } catch (e) { }
 
-        // Também remover links simbólicos se existirem (comum em Docker)
-        const lockLink = path.join(sessionPath, 'SingletonCookie');
-        if (fs.existsSync(lockLink)) {
-            fs.unlinkSync(lockLink);
-        }
-    } catch (e) {
-        console.log("⚠️ [Cleanup] Erro ao limpar locks:", e.message);
-    }
-
-    // 2. MATAR PROCESSOS ÓRFÃOS (Apenas Linux)
+    // 2. MATAR PROCESSOS ANTIGOS
     if (process.platform !== 'win32') {
-        try {
-            exec('pkill -f chromium || true');
-            console.log("🧹 [Cleanup] Tentando encerrar processos antigos de Chromium...");
-        } catch (e) { }
+        try { exec('pkill -9 chrome || true'); } catch (e) { }
     }
 
     // Captura erros globais temporariamente
@@ -703,18 +694,10 @@ async function scrape(limit = 50, foundLinks = [], newResults = []) {
     // Normalizar links já ignorados para comparação
     const ignoredLinks = new Set(ignoredListings.map(l => l.get("link").split('?')[0]));
 
-    const browser = await chromium.launch({
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || (process.platform === 'win32' ? null : '/usr/bin/chromium'),
-        headless: true,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--no-zygote',
-            '--single-process',
-            '--js-flags="--max-old-space-size=400"'
-        ]
-    });
+    console.log(`📡 OLX: Tentando conexão remota via Browserless...`);
+
+    // Conecta ao Browserless usando Playwright
+    const browser = await chromium.connectOverCDP(BROWSERLESS_WS);
     const context = await browser.newContext({
         userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
         bypassCSP: true
