@@ -625,7 +625,9 @@ async function scrape(limit = 50, foundLinks = [], newResults = []) {
     } catch (err) {
         console.error("❌ Erro durante o scraping:", err.message);
     } finally {
-        await browser.close();
+        // IMPORTANTE: usar disconnect() e não close()
+        // close() mata o browser remoto, derrubando também o WhatsApp
+        await browser.disconnect();
     }
     return allData;
 }
