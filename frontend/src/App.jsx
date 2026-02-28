@@ -70,7 +70,7 @@ function App() {
   }, [filter, showSplash, showTutorial]);
 
   const API_BASE_URL = window.location.origin.includes('localhost')
-    ? 'http://localhost:7860'
+    ? 'http://localhost:3000'
     : (window.location.origin.includes('vercel.app')
       ? 'https://olx-12ntim1b.b4a.run'
       : window.location.origin);

@@ -16,7 +16,7 @@ RUN npm install
 COPY . .
 
 # Porta 7860 (Hugging Face Default)
-EXPOSE 7860
+EXPOSE 3000
 
 # Iniciar
 CMD ["node", "scraper.js"]
