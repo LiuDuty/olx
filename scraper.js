@@ -557,6 +557,12 @@ async function scrape(limit = 50, foundLinks = [], newResults = []) {
         }
 
         const adUrlsResults = await page.evaluate(() => {
+            // Seletor específico da nova estrutura da OLX
+            const cardLinks = Array.from(document.querySelectorAll('a.olx-adcard__link'));
+            if (cardLinks.length > 0) {
+                return cardLinks.map(a => a.href.split('?')[0]);
+            }
+            // Fallback para links genéricos de imóveis
             const links = Array.from(document.querySelectorAll('a'));
             const filtered = links
                 .map(a => a.href)
@@ -582,26 +588,46 @@ async function scrape(limit = 50, foundLinks = [], newResults = []) {
             count++;
             const progress = Math.round((count / targetUrls.length) * 80) + 10;
             let retryCount = 0;
-            const maxRetries = 2;
+            const maxRetries = 1; // Reduzi retries para ser mais rápido
             let success = false;
 
             while (retryCount <= maxRetries && !success) {
                 try {
                     await updateScraperStatus(`Extraindo ${count}/${targetUrls.length}`, progress, adUrl, foundLinks);
-                    await page.goto(adUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
-                    await page.waitForTimeout(1500);
+                    await page.goto(adUrl, { waitUntil: 'load', timeout: 45000 });
+                    await page.waitForTimeout(2000);
+
+                    // Tenta clicar no botão de ver telefone se ele existir
+                    try {
+                        const phoneBtn = await page.$('button#price-box-button-show-phone');
+                        if (phoneBtn) {
+                            await phoneBtn.click();
+                            await page.waitForTimeout(1000);
+                        }
+                    } catch (e) {
+                        console.log("Botão de telefone não encontrado ou erro ao clicar.");
+                    }
 
                     const data = await page.evaluate(() => {
-                        const priceEl = document.querySelector('h2[data-testid="ad-price"]') ||
+                        // Seletor de preço atualizado baseado no price-box
+                        const priceEl = document.querySelector('#price-box-container span.typo-title-medium') ||
+                            document.querySelector('h2[data-testid="ad-price"]') ||
                             document.querySelector('.price-value') ||
                             document.querySelector('span.price');
+
                         const bodyText = document.body.innerText;
-                        const phoneMatch = bodyText.match(/(?:\(?\d{2}\)?\s?)(?:9\s?)?\d{4}[-\s]?\d{4}/);
-                        const sellerEl = document.querySelector('span[data-testid="ad-seller-name"]') ||
+                        // Regex melhorada para pegar telefones com/sem DDD e espaços
+                        const phoneMatch = bodyText.match(/(?:\(?\d{2}\)?\s?)?(?:9\s?)?\d{4}[-\s]?\d{4}/g);
+                        // Filtra o melhor match (geralmente o que tem DDD ou 11 dígitos)
+                        const bestPhone = phoneMatch ? phoneMatch.sort((a, b) => b.length - a.length)[0] : "Não informado";
+
+                        const sellerEl = document.querySelector('span.typo-body-large.ad__sc-ypp2u2-4') ||
+                            document.querySelector('span[data-testid="ad-seller-name"]') ||
                             document.querySelector('div[data-testid="profile-card"] h2');
+
                         return {
                             price: priceEl ? priceEl.innerText.trim() : "N/A",
-                            phone: phoneMatch ? phoneMatch[0].trim() : "Não informado",
+                            phone: bestPhone,
                             contactName: sellerEl ? sellerEl.innerText.trim() : "Desconhecido"
                         };
                     });
