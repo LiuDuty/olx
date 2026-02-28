@@ -241,11 +241,22 @@ function App() {
     }
   };
 
-  const filteredListings = listings.filter(l =>
-    l.get("price").toLowerCase().includes(search.toLowerCase()) ||
-    l.get("link").toLowerCase().includes(search.toLowerCase()) ||
-    (l.get("notes") || "").toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredListings = listings
+    .filter(l =>
+      l.get("price")?.toLowerCase().includes(search.toLowerCase()) ||
+      l.get("link")?.toLowerCase().includes(search.toLowerCase()) ||
+      (l.get("notes") || "").toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => {
+      const getDate = (obj) => {
+        const val = obj.get("capturedAt") || obj.get("lastUpdated");
+        if (!val) return new Date(0);
+        if (typeof val === 'string') return new Date(val);
+        if (val && typeof val === 'object' && val.iso) return new Date(val.iso);
+        return val;
+      };
+      return getDate(b) - getDate(a);
+    });
 
   return (
     <div className="container" style={{ maxWidth: '800px', margin: '0 auto' }}>
@@ -730,125 +741,174 @@ function ListingCard({ listing, onUpdate }) {
   const [note, setNote] = useState(listing.get("notes") || "");
   const [showNote, setShowNote] = useState(false);
 
+  const price = listing.get("price");
+  const phone = listing.get("phone");
+  const contactName = listing.get("contactName");
+  const isIgnored = listing.get("status") === 'ignored';
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
       className="glass"
-      style={{ padding: '20px', position: 'relative', overflow: 'hidden' }}
+      style={{
+        padding: '12px 20px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '20px',
+        borderLeft: isIgnored ? '4px solid #f43f5e' : (listing.get("isFavorite") ? '4px solid #f59e0b' : '4px solid transparent')
+      }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
-        <div>
-          <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--success)' }}>{listing.get("price")}</h3>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '4px' }}>
-            Capturado: {listing.get("capturedAt") ? DateTime.fromJSDate(listing.get("capturedAt")).toRelative() : (listing.get("lastUpdated") ? DateTime.fromJSDate(listing.get("lastUpdated")).toRelative() : 'Recentemente')}
-          </p>
+      {/* Preço (se não for N/A) */}
+      {price && price !== 'N/A' && (
+        <div style={{ minWidth: '110px', fontWeight: 800, color: 'var(--success)', fontSize: '1.1rem' }}>
+          {price}
         </div>
+      )}
 
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            onClick={() => onUpdate(listing, { isFavorite: !listing.get("isFavorite") })}
-            style={{
-              background: listing.get("isFavorite") ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255,255,255,0.05)',
-              color: listing.get("isFavorite") ? '#f59e0b' : 'var(--text-muted)',
-              padding: '8px',
-              borderRadius: '10px'
-            }}
-          >
-            <Star fill={listing.get("isFavorite") ? "currentColor" : "none"} size={20} />
-          </button>
-          <button
-            onClick={() => onUpdate(listing, { status: listing.get("status") === 'ignored' ? 'active' : 'ignored' })}
-            style={{
-              background: listing.get("status") === 'ignored' ? 'rgba(244, 63, 94, 0.2)' : 'rgba(255,255,255,0.05)',
-              color: listing.get("status") === 'ignored' ? 'var(--accent)' : 'var(--text-muted)',
-              padding: '8px',
-              borderRadius: '10px'
-            }}
-          >
-            {listing.get("status") === 'ignored' ? <RefreshCw size={20} /> : <Archive size={20} />}
-          </button>
-        </div>
-      </div>
-
-      <div style={{ marginBottom: '15px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--text-main)', fontSize: '0.95rem' }}>
-          <User size={16} />
-          <span style={{ fontWeight: 600 }}>{listing.get("contactName") || "Vendedor"}</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--text-muted)', fontSize: '0.95rem' }}>
-          <Smartphone size={16} />
-          <span>{listing.get("phone")}</span>
-          {listing.get("waLink") && (
-            <a
-              href={listing.get("waLink")}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                color: '#25D366',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                fontSize: '0.8rem',
-                textDecoration: 'none',
-                fontWeight: 600,
-                background: 'rgba(37, 211, 102, 0.1)',
-                padding: '2px 8px',
-                borderRadius: '12px'
-              }}
-            >
-              <MessageSquare size={12} /> WhatsApp
-            </a>
-          )}
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', gap: '10px' }}>
+      {/* Telefone Clicável */}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px' }}>
         <a
-          href={listing.get("link")}
-          target="_blank"
-          rel="noopener noreferrer"
+          href={`tel:${phone ? phone.replace(/\D/g, '') : ''}`}
           style={{
-            flex: 1,
-            textAlign: 'center',
-            background: 'rgba(255,255,255,0.05)',
-            color: 'white',
+            color: 'var(--text-main)',
             textDecoration: 'none',
-            padding: '12px',
-            borderRadius: '10px',
+            fontWeight: 700,
+            fontSize: '1rem',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
             gap: '8px',
-            fontWeight: 600
+            background: 'rgba(255,255,255,0.05)',
+            padding: '6px 14px',
+            borderRadius: '8px',
+            transition: 'all 0.2s'
           }}
+          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+          onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
         >
-          Ver no OLX <ExternalLink size={16} />
+          <Smartphone size={16} color="var(--primary)" />
+          {phone}
         </a>
+
+        {/* Nome e Data/Hora */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          {(contactName && contactName !== 'Desconhecido') && (
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600 }}>
+              {contactName}
+            </span>
+          )}
+          <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.7rem', fontWeight: 500 }}>
+            {(() => {
+              const capDate = listing.get("capturedAt") || listing.get("lastUpdated");
+              if (!capDate) return '-';
+
+              let isoStr = '';
+              if (typeof capDate === 'string') {
+                isoStr = capDate;
+              } else if (capDate && typeof capDate === 'object' && capDate.iso) {
+                isoStr = capDate.iso;
+              }
+
+              if (isoStr) {
+                const dt = DateTime.fromISO(isoStr);
+                return dt.isValid ? dt.toFormat('dd/MM/yyyy HH:mm') : '-';
+              }
+
+              const dtJS = DateTime.fromJSDate(capDate);
+              return dtJS.isValid ? dtJS.toFormat('dd/MM/yyyy HH:mm') : '-';
+            })()}
+          </span>
+        </div>
+      </div>
+
+      {/* Link OLX Minimalista */}
+      <a
+        href={listing.get("link")}
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Abrir no OLX"
+        style={{
+          color: 'var(--text-muted)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '5px',
+          fontSize: '0.8rem',
+          textDecoration: 'none',
+          padding: '6px'
+        }}
+      >
+        <ExternalLink size={16} />
+      </a>
+
+      {/* Ações Rápidas */}
+      <div style={{ display: 'flex', gap: '8px' }}>
         <button
           onClick={() => setShowNote(!showNote)}
-          className="glass"
-          style={{ padding: '12px', color: 'white', borderRadius: '10px' }}
+          style={{
+            background: showNote ? 'var(--primary)' : 'transparent',
+            color: showNote ? 'white' : 'var(--text-muted)',
+            padding: '6px'
+          }}
+          title="Ver Notas"
         >
           <MessageSquare size={18} />
         </button>
+
+        <button
+          onClick={() => onUpdate(listing, { isFavorite: !listing.get("isFavorite") })}
+          style={{
+            background: 'transparent',
+            color: listing.get("isFavorite") ? '#f59e0b' : 'var(--text-muted)',
+            padding: '6px'
+          }}
+          title="Favoritar"
+        >
+          <Star fill={listing.get("isFavorite") ? "#f59e0b" : "none"} size={20} />
+        </button>
+
+        <button
+          onClick={() => onUpdate(listing, { status: isIgnored ? 'active' : 'ignored' })}
+          style={{
+            background: 'transparent',
+            color: isIgnored ? 'var(--accent)' : 'var(--text-muted)',
+            padding: '6px'
+          }}
+          title={isIgnored ? "Restaurar" : "Ignorar"}
+        >
+          {isIgnored ? <RefreshCw size={18} /> : <Archive size={18} />}
+        </button>
       </div>
 
+      {/* Área de Notas Expansível */}
       <AnimatePresence>
         {showNote && (
           <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            style={{ marginTop: '15px', overflow: 'hidden' }}
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: '250px', opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            style={{
+              position: 'absolute',
+              right: '220px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              zIndex: 10,
+              background: 'var(--bg-dark)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              padding: '10px',
+              borderRadius: '10px',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px'
+            }}
           >
             <textarea
-              rows="3"
-              placeholder="Adicionar observações..."
+              rows="2"
+              placeholder="Notas..."
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              style={{ fontSize: '0.9rem' }}
+              style={{ fontSize: '0.8rem', width: '100%', background: 'rgba(255,255,255,0.05)' }}
             />
             <button
               onClick={() => {
@@ -856,16 +916,15 @@ function ListingCard({ listing, onUpdate }) {
                 setShowNote(false);
               }}
               style={{
-                marginTop: '10px',
-                width: '100%',
                 background: 'var(--primary)',
                 color: 'white',
-                padding: '8px',
-                borderRadius: '8px',
-                fontWeight: 600
+                padding: '5px',
+                borderRadius: '6px',
+                fontSize: '0.75rem',
+                fontWeight: 700
               }}
             >
-              Salvar Notas
+              SALVAR
             </button>
           </motion.div>
         )}
