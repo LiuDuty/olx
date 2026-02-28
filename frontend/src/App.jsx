@@ -20,7 +20,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import CalendarBox from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 
+const APP_VERSION = "2.1.0"; // Versão atual para controle de release
+
 function App() {
+  const [showSplash, setShowSplash] = useState(true);
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState(0);
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isScraping, setIsScraping] = useState(false);
@@ -36,23 +41,38 @@ function App() {
   const [selectedDate, setSelectedDate] = useState(new Date());
 
   useEffect(() => {
-    fetchListings();
-    fetchConfig();
-    fetchStatus();
-    fetchWhatsapp();
-    const interval = setInterval(() => {
+    // Esconde splash após 2.5 segundos
+    const splashTimer = setTimeout(() => {
+      setShowSplash(false);
+
+      const lastSeenVersion = localStorage.getItem('last_seen_version');
+      if (lastSeenVersion !== APP_VERSION) {
+        setShowTutorial(true);
+      }
+    }, 2500);
+
+    return () => clearTimeout(splashTimer);
+  }, []);
+
+  useEffect(() => {
+    if (!showSplash && !showTutorial) {
       fetchListings();
+      fetchConfig();
       fetchStatus();
       fetchWhatsapp();
-    }, 15000); // Mais frequente para monitoramento
-    return () => clearInterval(interval);
-  }, [filter]);
+      const interval = setInterval(() => {
+        fetchListings();
+        fetchStatus();
+        fetchWhatsapp();
+      }, 15000);
+      return () => clearInterval(interval);
+    }
+  }, [filter, showSplash, showTutorial]);
 
-  // Detecta automaticamente a URL da API baseada no ambiente
   const API_BASE_URL = window.location.origin.includes('localhost')
     ? 'http://localhost:7860'
     : (window.location.origin.includes('vercel.app')
-      ? 'https://olx-12ntim1b.b4a.run' // Fallback para o backend no B4A se estiver no Vercel
+      ? 'https://olx-12ntim1b.b4a.run'
       : window.location.origin);
 
   const fetchWhatsapp = async () => {
@@ -229,355 +249,480 @@ function App() {
 
   return (
     <div className="container" style={{ maxWidth: '800px', margin: '0 auto' }}>
-      {/* Header */}
-      <header style={{ marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
-        <div>
-          <h1 style={{ fontSize: '2rem', fontWeight: 800, background: 'linear-gradient(to right, #6366f1, #f43f5e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            OpenHouses Pro OLX
-          </h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '5px' }}>
-            <span style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '4px 12px',
-              background: 'rgba(99, 102, 241, 0.1)',
-              borderRadius: '20px',
-              border: '1px solid rgba(99, 102, 241, 0.2)',
-              color: 'var(--primary)',
-              fontWeight: 600
-            }}>
-              <Calendar size={14} />
-              AGENDADO: {nextRun ? DateTime.fromISO(nextRun).toFormat('dd/MM \'às\' HH:mm') : 'Não agendado'}
-            </span>
-
-            <a
-              href={`${API_BASE_URL}/qr`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '4px 12px',
-                background: whatsappStatus.status.includes('Pronto') ? 'rgba(34, 197, 94, 0.1)' : 'rgba(245, 158, 11, 0.1)',
-                borderRadius: '20px',
-                border: `1px solid ${whatsappStatus.status.includes('Pronto') ? 'rgba(34, 197, 94, 0.2)' : 'rgba(245, 158, 11, 0.2)'}`,
-                color: whatsappStatus.status.includes('Pronto') ? '#22c55e' : '#f59e0b',
-                fontWeight: 600,
-                textDecoration: 'none',
-                marginLeft: '10px'
-              }}
-            >
-              <Smartphone size={14} />
-              WHATSAPP: {whatsappStatus.status}
-              {whatsappStatus.hasQr && <span style={{ padding: '2px 6px', background: '#ef4444', color: 'white', borderRadius: '4px', fontSize: '0.6rem', marginLeft: '4px' }}>QR</span>}
-            </a>
-          </p>
-        </div>
-
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button
-            onClick={() => setShowCalendar(!showCalendar)}
-            className="glass"
-            style={{
-              padding: '10px 15px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              color: 'white',
-              background: showCalendar ? 'var(--primary)' : 'rgba(255,255,255,0.05)'
-            }}
-          >
-            <Calendar size={18} />
-          </button>
-
-          <div className="glass" style={{ display: 'flex', alignItems: 'center', padding: '5px 12px', gap: '8px' }}>
-            <input
-              type="checkbox"
-              checked={limitEnabled}
-              onChange={() => {
-                const newState = !limitEnabled;
-                setLimitEnabled(newState);
-                saveConfig('limit_enabled', newState);
-              }}
-              style={{
-                cursor: 'pointer',
-                width: '18px',
-                height: '18px',
-                accentColor: 'var(--primary)'
-              }}
-            />
-
-            <span
-              onClick={() => {
-                const newState = !limitEnabled;
-                setLimitEnabled(newState);
-                saveConfig('limit_enabled', newState);
-              }}
-              style={{
-                fontSize: '0.7rem',
-                color: limitEnabled ? 'white' : 'var(--text-muted)',
-                fontWeight: 600,
-                cursor: 'pointer',
-                userSelect: 'none'
-              }}
-            >
-              LIMITE (MAX):
-            </span>
-            <input
-              type="number"
-              value={limit}
-              disabled={!limitEnabled}
-              onChange={(e) => {
-                setLimit(e.target.value);
-                saveConfig('limit_value', e.target.value);
-              }}
-              style={{
-                width: '35px',
-                background: 'transparent',
-                border: 'none',
-                textAlign: 'center',
-                padding: '5px 0',
-                fontSize: '0.9rem',
-                opacity: limitEnabled ? 1 : 0.3,
-                color: 'white',
-                outline: 'none',
-                borderBottom: limitEnabled ? '1px solid rgba(255,255,255,0.2)' : 'none'
-              }}
-              min="1"
-              max="500"
-            />
-          </div>
-
-          <button
-            onClick={runScraper}
-            disabled={isScraping}
-            style={{
-              background: 'var(--primary)',
-              color: 'white',
-              padding: '10px 20px',
-              borderRadius: '12px',
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              boxShadow: '0 4px 15px rgba(99, 102, 241, 0.4)'
-            }}
-          >
-            <RefreshCw size={18} className={isScraping ? 'spin' : ''} />
-            {isScraping ? 'Rodando...' : 'Extrair Agora'}
-          </button>
-
-          <button
-            onClick={handleClearDatabase}
-            title="Apagar Toda a Base"
-            style={{
-              background: 'rgba(244, 63, 94, 0.1)',
-              border: '1px solid rgba(244, 63, 94, 0.2)',
-              color: 'var(--accent)',
-              padding: '10px',
-              borderRadius: '12px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <Trash2 size={18} />
-          </button>
-        </div>
-      </header>
-
-      {/* Calendário de Agendamento */}
       <AnimatePresence>
-        {showCalendar && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="glass"
-            style={{ marginBottom: '25px', padding: '20px', overflow: 'hidden' }}
-          >
-            <h4 style={{ marginBottom: '15px', fontWeight: 600 }}>Escolha a data e hora:</h4>
-            <div className="calendar-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
-              <CalendarBox
-                onChange={setSelectedDate}
-                value={selectedDate}
-                minDate={new Date()}
-                className="custom-calendar"
-              />
+        {showSplash && <SplashScreen version={APP_VERSION} />}
+        {showTutorial && (
+          <TutorialStep
+            step={tutorialStep}
+            onNext={() => {
+              if (tutorialStep < 2) setTutorialStep(tutorialStep + 1);
+              else {
+                setShowTutorial(false);
+                localStorage.setItem('last_seen_version', APP_VERSION);
+              }
+            }}
+            onSkip={() => {
+              setShowTutorial(false);
+              localStorage.setItem('last_seen_version', APP_VERSION);
+            }}
+          />
+        )}
+      </AnimatePresence>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '15px', width: '100%', justifyContent: 'center', background: 'rgba(0,0,0,0.2)', padding: '15px', borderRadius: '12px' }}>
-                <Clock size={20} color="var(--primary)" />
-                <span style={{ fontWeight: 600 }}>Horário:</span>
-                <input
-                  type="time"
-                  value={scheduledTime}
-                  onChange={(e) => setScheduledTime(e.target.value)}
+      {!showSplash && !showTutorial && (
+        <>
+          {/* Header */}
+          <header style={{ marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
+            <div>
+              <h1 style={{ fontSize: '2rem', fontWeight: 800, background: 'linear-gradient(to right, #6366f1, #f43f5e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                OpenHouses Pro OLX
+              </h1>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '5px' }}>
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '4px 12px',
+                  background: 'rgba(99, 102, 241, 0.1)',
+                  borderRadius: '20px',
+                  border: '1px solid rgba(99, 102, 241, 0.2)',
+                  color: 'var(--primary)',
+                  fontWeight: 600
+                }}>
+                  <Calendar size={14} />
+                  AGENDADO: {nextRun ? DateTime.fromISO(nextRun).toFormat('dd/MM \'às\' HH:mm') : 'Não agendado'}
+                </span>
+
+                <a
+                  href={`${API_BASE_URL}/qr`}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   style={{
-                    background: 'var(--bg-dark)',
-                    border: '1px solid var(--primary)',
-                    color: 'white',
-                    padding: '8px',
-                    borderRadius: '8px',
-                    fontSize: '1.1rem'
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '4px 12px',
+                    background: whatsappStatus.status.includes('Pronto') ? 'rgba(34, 197, 94, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                    borderRadius: '20px',
+                    border: `1px solid ${whatsappStatus.status.includes('Pronto') ? 'rgba(34, 197, 94, 0.2)' : 'rgba(245, 158, 11, 0.2)'}`,
+                    color: whatsappStatus.status.includes('Pronto') ? '#22c55e' : '#f59e0b',
+                    fontWeight: 600,
+                    textDecoration: 'none',
+                    marginLeft: '10px'
                   }}
+                >
+                  <Smartphone size={14} />
+                  WHATSAPP: {whatsappStatus.status}
+                  {whatsappStatus.hasQr && <span style={{ padding: '2px 6px', background: '#ef4444', color: 'white', borderRadius: '4px', fontSize: '0.6rem', marginLeft: '4px' }}>QR</span>}
+                </a>
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={() => setShowCalendar(!showCalendar)}
+                className="glass"
+                style={{
+                  padding: '10px 15px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  color: 'white',
+                  background: showCalendar ? 'var(--primary)' : 'rgba(255,255,255,0.05)'
+                }}
+              >
+                <Calendar size={18} />
+              </button>
+
+              <div className="glass" style={{ display: 'flex', alignItems: 'center', padding: '5px 12px', gap: '8px' }}>
+                <input
+                  type="checkbox"
+                  checked={limitEnabled}
+                  onChange={() => {
+                    const newState = !limitEnabled;
+                    setLimitEnabled(newState);
+                    saveConfig('limit_enabled', newState);
+                  }}
+                  style={{
+                    cursor: 'pointer',
+                    width: '18px',
+                    height: '18px',
+                    accentColor: 'var(--primary)'
+                  }}
+                />
+
+                <span
+                  onClick={() => {
+                    const newState = !limitEnabled;
+                    setLimitEnabled(newState);
+                    saveConfig('limit_enabled', newState);
+                  }}
+                  style={{
+                    fontSize: '0.7rem',
+                    color: limitEnabled ? 'white' : 'var(--text-muted)',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    userSelect: 'none'
+                  }}
+                >
+                  LIMITE (MAX):
+                </span>
+                <input
+                  type="number"
+                  value={limit}
+                  disabled={!limitEnabled}
+                  onChange={(e) => {
+                    setLimit(e.target.value);
+                    saveConfig('limit_value', e.target.value);
+                  }}
+                  style={{
+                    width: '35px',
+                    background: 'transparent',
+                    border: 'none',
+                    textAlign: 'center',
+                    padding: '5px 0',
+                    fontSize: '0.9rem',
+                    opacity: limitEnabled ? 1 : 0.3,
+                    color: 'white',
+                    outline: 'none',
+                    borderBottom: limitEnabled ? '1px solid rgba(255,255,255,0.2)' : 'none'
+                  }}
+                  min="1"
+                  max="500"
                 />
               </div>
 
               <button
-                onClick={handleSaveSchedule}
+                onClick={runScraper}
+                disabled={isScraping}
                 style={{
-                  width: '100%',
                   background: 'var(--primary)',
                   color: 'white',
-                  padding: '12px',
+                  padding: '10px 20px',
                   borderRadius: '12px',
-                  fontWeight: 800,
-                  fontSize: '1rem',
-                  boxShadow: '0 4px 15px rgba(99, 102, 241, 0.3)'
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 4px 15px rgba(99, 102, 241, 0.4)'
                 }}
               >
-                SALVAR AGENDAMENTO
+                <RefreshCw size={18} className={isScraping ? 'spin' : ''} />
+                {isScraping ? 'Rodando...' : 'Extrair Agora'}
+              </button>
+
+              <button
+                onClick={handleClearDatabase}
+                title="Apagar Toda a Base"
+                style={{
+                  background: 'rgba(244, 63, 94, 0.1)',
+                  border: '1px solid rgba(244, 63, 94, 0.2)',
+                  color: 'var(--accent)',
+                  padding: '10px',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <Trash2 size={18} />
               </button>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </header>
 
-      {/* Monitor em Tempo Real */}
-      <AnimatePresence>
-        {isScraping && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="glass"
-            style={{ marginBottom: '25px', padding: '20px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--primary)' }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                Monitor de Extração Live
-              </span>
-              <span style={{ fontSize: '0.9rem', color: 'white' }}>{liveStatus.progress}%</span>
-            </div>
-
-            <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '10px', overflow: 'hidden', marginBottom: '15px' }}>
-              <motion.div
-                style={{ height: '100%', background: 'linear-gradient(90deg, var(--primary), var(--accent))' }}
-                animate={{ width: `${liveStatus.progress}%` }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div className="spin" style={{ width: '15px', height: '15px', border: '2px solid var(--primary)', borderTopColor: 'transparent', borderRadius: '50%' }} />
-              <span style={{ fontSize: '0.95rem', color: 'var(--text-main)' }}>{liveStatus.message}</span>
-            </div>
-
-            {liveStatus.currentItem && (
-              <div style={{ marginTop: '10px', fontSize: '0.8rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '8px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px', borderLeft: '3px solid var(--primary)' }}>
-                PROCESSANDO: {liveStatus.currentItem}
-              </div>
-            )}
-
-            {liveStatus.links && liveStatus.links.length > 0 && (
-              <div style={{ marginTop: '15px' }}>
-                <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase' }}>
-                  Registros Encontrados ({liveStatus.links.length}):
-                </div>
-                <div style={{ maxHeight: '150px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  {liveStatus.links.map((link, idx) => (
-                    <div key={idx} className="glass" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', fontSize: '0.8rem', background: 'rgba(255,255,255,0.02)' }}>
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%', color: 'var(--text-main)' }}>
-                        {link}
-                      </span>
-                      <div style={{ display: 'flex', gap: '10px' }}>
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(link);
-                          }}
-                          style={{ background: 'transparent', padding: '0', color: 'var(--text-muted)' }}
-                          title="Copiar Link"
-                        >
-                          <Copy size={14} />
-                        </button>
-                        <a
-                          href={link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ color: 'var(--primary)', display: 'flex', alignItems: 'center' }}
-                          title="Abrir Anúncio"
-                        >
-                          <ExternalLink size={14} />
-                        </a>
-                      </div>
-                    </div>
-                  )).reverse()}
-                </div>
-              </div>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Search & Tabs */}
-      <div style={{ marginBottom: '25px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
-        <div style={{ position: 'relative' }}>
-          <Search style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={18} />
-          <input
-            type="text"
-            placeholder="Pesquisar links, preços ou notas..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ paddingLeft: '45px', height: '50px', fontSize: '1rem' }}
-          />
-        </div>
-
-        <div className="glass" style={{ display: 'flex', padding: '5px', gap: '5px' }}>
-          {['active', 'favorites', 'ignored'].map(t => (
-            <button
-              key={t}
-              onClick={() => setFilter(t)}
-              style={{
-                flex: 1,
-                padding: '10px',
-                borderRadius: '12px',
-                background: filter === t ? 'rgba(255,255,255,0.1)' : 'transparent',
-                color: filter === t ? 'white' : 'var(--text-muted)',
-                fontWeight: 600,
-                textTransform: 'capitalize'
-              }}
-            >
-              {t === 'active' ? 'Todos' : t === 'favorites' ? 'Favoritos' : 'Ignorados'}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Listings */}
-      <div style={{ display: 'grid', gap: '20px' }}>
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '50px', color: 'var(--text-muted)' }}>Carrregando imóveis...</div>
-        ) : filteredListings.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '50px', color: 'var(--text-muted)' }}>Nenhum item encontrado.</div>
-        ) : (
+          {/* Calendário de Agendamento */}
           <AnimatePresence>
-            {filteredListings.map((l) => (
-              <ListingCard
-                key={l.id}
-                listing={l}
-                onUpdate={handleUpdateListing}
-              />
-            ))}
+            {showCalendar && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="glass"
+                style={{ marginBottom: '25px', padding: '20px', overflow: 'hidden' }}
+              >
+                <h4 style={{ marginBottom: '15px', fontWeight: 600 }}>Escolha a data e hora:</h4>
+                <div className="calendar-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+                  <CalendarBox
+                    onChange={setSelectedDate}
+                    value={selectedDate}
+                    minDate={new Date()}
+                    className="custom-calendar"
+                  />
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '15px', width: '100%', justifyContent: 'center', background: 'rgba(0,0,0,0.2)', padding: '15px', borderRadius: '12px' }}>
+                    <Clock size={20} color="var(--primary)" />
+                    <span style={{ fontWeight: 600 }}>Horário:</span>
+                    <input
+                      type="time"
+                      value={scheduledTime}
+                      onChange={(e) => setScheduledTime(e.target.value)}
+                      style={{
+                        background: 'var(--bg-dark)',
+                        border: '1px solid var(--primary)',
+                        color: 'white',
+                        padding: '8px',
+                        borderRadius: '8px',
+                        fontSize: '1.1rem'
+                      }}
+                    />
+                  </div>
+
+                  <button
+                    onClick={handleSaveSchedule}
+                    style={{
+                      width: '100%',
+                      background: 'var(--primary)',
+                      color: 'white',
+                      padding: '12px',
+                      borderRadius: '12px',
+                      fontWeight: 800,
+                      fontSize: '1rem',
+                      boxShadow: '0 4px 15px rgba(99, 102, 241, 0.3)'
+                    }}
+                  >
+                    SALVAR AGENDAMENTO
+                  </button>
+                </div>
+              </motion.div>
+            )}
           </AnimatePresence>
-        )}
-      </div>
+
+          {/* Monitor em Tempo Real */}
+          <AnimatePresence>
+            {isScraping && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="glass"
+                style={{ marginBottom: '25px', padding: '20px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--primary)' }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                    Monitor de Extração Live
+                  </span>
+                  <span style={{ fontSize: '0.9rem', color: 'white' }}>{liveStatus.progress}%</span>
+                </div>
+
+                <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '10px', overflow: 'hidden', marginBottom: '15px' }}>
+                  <motion.div
+                    style={{ height: '100%', background: 'linear-gradient(90deg, var(--primary), var(--accent))' }}
+                    animate={{ width: `${liveStatus.progress}%` }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div className="spin" style={{ width: '15px', height: '15px', border: '2px solid var(--primary)', borderTopColor: 'transparent', borderRadius: '50%' }} />
+                  <span style={{ fontSize: '0.95rem', color: 'var(--text-main)' }}>{liveStatus.message}</span>
+                </div>
+
+                {liveStatus.currentItem && (
+                  <div style={{ marginTop: '10px', fontSize: '0.8rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '8px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px', borderLeft: '3px solid var(--primary)' }}>
+                    PROCESSANDO: {liveStatus.currentItem}
+                  </div>
+                )}
+
+                {liveStatus.links && liveStatus.links.length > 0 && (
+                  <div style={{ marginTop: '15px' }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase' }}>
+                      Registros Encontrados ({liveStatus.links.length}):
+                    </div>
+                    <div style={{ maxHeight: '150px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                      {liveStatus.links.map((link, idx) => (
+                        <div key={idx} className="glass" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', fontSize: '0.8rem', background: 'rgba(255,255,255,0.02)' }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%', color: 'var(--text-main)' }}>
+                            {link}
+                          </span>
+                          <div style={{ display: 'flex', gap: '10px' }}>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(link);
+                              }}
+                              style={{ background: 'transparent', padding: '0', color: 'var(--text-muted)' }}
+                              title="Copiar Link"
+                            >
+                              <Copy size={14} />
+                            </button>
+                            <a
+                              href={link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ color: 'var(--primary)', display: 'flex', alignItems: 'center' }}
+                              title="Abrir Anúncio"
+                            >
+                              <ExternalLink size={14} />
+                            </a>
+                          </div>
+                        </div>
+                      )).reverse()}
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Search & Tabs */}
+          <div style={{ marginBottom: '25px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <div style={{ position: 'relative' }}>
+              <Search style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={18} />
+              <input
+                type="text"
+                placeholder="Pesquisar links, preços ou notas..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{ paddingLeft: '45px', height: '50px', fontSize: '1rem' }}
+              />
+            </div>
+
+            <div className="glass" style={{ display: 'flex', padding: '5px', gap: '5px' }}>
+              {['active', 'favorites', 'ignored'].map(t => (
+                <button
+                  key={t}
+                  onClick={() => setFilter(t)}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    borderRadius: '12px',
+                    background: filter === t ? 'rgba(255,255,255,0.1)' : 'transparent',
+                    color: filter === t ? 'white' : 'var(--text-muted)',
+                    fontWeight: 600,
+                    textTransform: 'capitalize'
+                  }}
+                >
+                  {t === 'active' ? 'Todos' : t === 'favorites' ? 'Favoritos' : 'Ignorados'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Listings */}
+          <div style={{ display: 'grid', gap: '20px' }}>
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '50px', color: 'var(--text-muted)' }}>Carrregando imóveis...</div>
+            ) : filteredListings.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '50px', color: 'var(--text-muted)' }}>Nenhum item encontrado.</div>
+            ) : (
+              <AnimatePresence>
+                {filteredListings.map((l) => (
+                  <ListingCard
+                    key={l.id}
+                    listing={l}
+                    onUpdate={handleUpdateListing}
+                  />
+                ))}
+              </AnimatePresence>
+            )}
+          </div>
+        </>
+      )}
 
       <style>{`
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
       `}</style>
     </div>
+  );
+}
+
+function SplashScreen({ version }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9999, background: 'var(--bg-dark)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
+      }}
+    >
+      <motion.div
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ delay: 0.2 }}
+        style={{ textAlign: 'center' }}
+      >
+        <div style={{
+          width: '80px', height: '80px', background: 'linear-gradient(135deg, var(--primary), var(--accent))',
+          borderRadius: '22px', margin: '0 auto 20px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 0 30px rgba(99, 102, 241, 0.5)'
+        }}>
+          <RefreshCw size={40} color="white" className="spin" />
+        </div>
+        <h1 style={{ fontSize: '2.5rem', fontWeight: 900, marginBottom: '5px' }}>OpenHouses Pro</h1>
+        <p style={{ color: 'var(--primary)', fontWeight: 700, letterSpacing: '2px' }}>V {version}</p>
+        <div style={{ marginTop: '20px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Carregando seus dados...</div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function TutorialStep({ step, onNext, onSkip }) {
+  const steps = [
+    {
+      title: "🚀 Bem-vindo ao OpenHouses!",
+      content: "Este robô monitora a OLX de Alphaville e arredores para encontrar as melhores oportunidades de imóveis direto com proprietários.",
+      icon: <RefreshCw size={32} color="white" />
+    },
+    {
+      title: "📋 Gestão de Anúncios",
+      content: "Você pode favoritar imóveis, adicionar notas pessoais e ignorar o que não interessa. Itens ignorados não aparecem mais nas extrações.",
+      icon: <Star size={32} color="white" />
+    },
+    {
+      title: "📱 WhatsApp & Agendamento",
+      content: "Conecte seu WhatsApp para receber o resumo diário. Use o calendário para agendar quando o robô deve rodar automaticamente.",
+      icon: <Smartphone size={32} color="white" />
+    }
+  ];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(15, 23, 42, 0.95)',
+        backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
+      }}
+    >
+      <motion.div
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        className="glass"
+        style={{ maxWidth: '450px', width: '100%', padding: '40px', textAlign: 'center' }}
+      >
+        <div style={{
+          width: '64px', height: '64px', background: 'var(--primary)', borderRadius: '16px',
+          margin: '0 auto 20px', display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          {steps[step].icon}
+        </div>
+        <h2 style={{ marginBottom: '15px', fontWeight: 800 }}>{steps[step].title}</h2>
+        <p style={{ color: 'var(--text-muted)', lineHeight: '1.6', marginBottom: '30px' }}>{steps[step].content}</p>
+
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            onClick={onSkip}
+            style={{ flex: 1, padding: '12px', borderRadius: '10px', background: 'transparent', color: 'var(--text-muted)', border: '1px solid rgba(255,255,255,0.1)' }}
+          >
+            Pular Tudo
+          </button>
+          <button
+            onClick={onNext}
+            style={{ flex: 2, padding: '12px', borderRadius: '10px', background: 'var(--primary)', color: 'white', fontWeight: 800 }}
+          >
+            {step === 2 ? "Finalizar" : "Próximo"}
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', marginTop: '20px' }}>
+          {[0, 1, 2].map(i => (
+            <div key={i} style={{ width: '8px', height: '8px', borderRadius: '50%', background: i === step ? 'var(--primary)' : 'rgba(255,255,255,0.1)' }} />
+          ))}
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
