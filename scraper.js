@@ -36,9 +36,16 @@ let whatsappStatus = 'Iniciando...';
 // SERVIDOR EXPRESS
 // ==========================================
 const app = express();
-app.use(cors());
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+    credentials: true,
+    optionsSuccessStatus: 200
+}));
 app.use(express.json());
 
+// Middleware para LOGS de requisições
 app.use((req, res, next) => {
     console.log(`📡 [${new Date().toISOString()}] ${req.method} ${req.url}`);
     next();
