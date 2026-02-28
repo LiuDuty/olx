@@ -11,15 +11,15 @@ import {
   Search,
   ChevronRight,
   MessageSquare,
+  Home,
+  Layout,
+  Bath,
   Smartphone,
   User,
   Calendar,
   Copy,
   Maximize,
-  MapPin,
-  Home,
-  Layout,
-  Bath
+  MapPin
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import CalendarBox from 'react-calendar';
@@ -78,7 +78,7 @@ function App() {
 
   const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:3000'
-    : 'https://olx-12ntim1b.b4a.run';
+    : 'https://olx-12ntim1b.b4a.app';
 
   const fetchWhatsapp = async () => {
     try {
@@ -121,7 +121,7 @@ function App() {
       const results = await response.json();
 
       const mappedResults = Array.isArray(results) ? results.map(item => ({
-        id: item.objectId,
+        id: item.objectId || item.id,
         get: (field) => item[field],
         set: (field, value) => { item[field] = value }
       })) : [];
