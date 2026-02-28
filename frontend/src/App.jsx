@@ -48,11 +48,17 @@ function App() {
     return () => clearInterval(interval);
   }, [filter]);
 
-  const API_BASE_URL = 'https://liuduty-olx-robot.hf.space';
+  // Detecta automaticamente a URL da API baseada no ambiente
+  const API_BASE_URL = window.location.origin.includes('localhost')
+    ? 'http://localhost:7860'
+    : (window.location.origin.includes('vercel.app')
+      ? 'https://olx-12ntim1b.b4a.run' // Fallback para o backend no B4A se estiver no Vercel
+      : window.location.origin);
 
   const fetchWhatsapp = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/whatsapp-status`);
+      if (!response.ok) throw new Error('Falha ao buscar status do WhatsApp');
       const data = await response.json();
       setWhatsappStatus(data);
     } catch (error) {
@@ -63,6 +69,7 @@ function App() {
   const fetchStatus = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/status`);
+      if (!response.ok) throw new Error('Falha ao buscar status do scraper');
       const data = await response.json();
       if (data) {
         setLiveStatus({
@@ -71,7 +78,6 @@ function App() {
           currentItem: data.currentItem,
           links: data.links || []
         });
-        // Se o progresso for entre 1 e 99, forçamos o estado de scraping visual
         if (data.progress > 0 && data.progress < 100) {
           setIsScraping(true);
         } else if (data.progress === 100 || data.progress === 0) {
@@ -86,19 +92,21 @@ function App() {
   const fetchListings = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/listings?filter=${filter}`);
+      if (!response.ok) throw new Error(`Erro HTTP: ${response.status}`);
       const results = await response.json();
 
-      // Mapear os dados para o formato esperado (Parse Object like)
-      const mappedResults = results.map(item => ({
+      const mappedResults = Array.isArray(results) ? results.map(item => ({
         id: item.objectId,
         get: (field) => item[field],
         set: (field, value) => { item[field] = value }
-      }));
+      })) : [];
 
       setListings(mappedResults);
-      setLoading(false);
     } catch (error) {
       console.error("Error fetching listings:", error);
+      // Opcional: mostrar mensagem de erro na UI
+    } finally {
+      setLoading(false);
     }
   };
 

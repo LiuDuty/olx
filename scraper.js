@@ -24,7 +24,7 @@ chromium.use(stealth);
 // CONFIGURAÇÃO
 // ==========================================
 const TELEFONE_DESTINO = process.env.TELEFONE_DESTINO || '5511975040117';
-const PORT = process.env.PORT || 7860;
+const PORT = process.env.PORT || 3000;
 const BROWSERLESS_TOKEN = process.env.BROWSERLESS_TOKEN || '2U1KDYckXbPO4pc065f0e047f92f67e4ab2dbe8e65ac0fd55';
 const BROWSERLESS_WS = `wss://chrome.browserless.io?token=${BROWSERLESS_TOKEN}`;
 
@@ -263,10 +263,14 @@ app.post('/api/whatsapp-reset', async (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🌐 Servidor Web ativo na porta ${PORT}`);
-    // Auto-ping para manter o servidor ativo
-    const HF_URL = 'https://liuduty-olx-robot.hf.space';
+
+    // Auto-ping dinâmico para evitar hibernação
+    const SELF_URL = process.env.APP_URL || `http://localhost:${PORT}`;
     setInterval(() => {
-        https.get(HF_URL, () => { }).on('error', (err) => {
+        if (SELF_URL.includes('localhost')) return;
+        console.log(`📡 [Keep-Alive] Ping em ${SELF_URL}`);
+        const protocol = SELF_URL.startsWith('https') ? https : require('http');
+        protocol.get(SELF_URL, () => { }).on('error', (err) => {
             console.error(`❌ [Keep-Alive] Erro: ${err.message}`);
         });
     }, 5 * 60 * 1000);
