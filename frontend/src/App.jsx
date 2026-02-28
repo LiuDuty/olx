@@ -14,7 +14,12 @@ import {
   Smartphone,
   User,
   Calendar,
-  Copy
+  Copy,
+  Maximize,
+  MapPin,
+  Home,
+  Layout,
+  Bath
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import CalendarBox from 'react-calendar';
@@ -45,8 +50,10 @@ function App() {
     const splashTimer = setTimeout(() => {
       setShowSplash(false);
 
-      const lastSeenVersion = localStorage.getItem('last_seen_version');
-      if (lastSeenVersion !== APP_VERSION) {
+      const isTutorialDisabled = localStorage.getItem('tutorial_disabled') === 'true';
+      const isTutorialShownInSession = sessionStorage.getItem('tutorial_shown') === 'true';
+
+      if (!isTutorialDisabled && !isTutorialShownInSession) {
         setShowTutorial(true);
       }
     }, 2500);
@@ -69,11 +76,9 @@ function App() {
     }
   }, [filter, showSplash, showTutorial]);
 
-  const API_BASE_URL = window.location.origin.includes('localhost')
+  const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:3000'
-    : (window.location.origin.includes('vercel.app')
-      ? 'https://olx-12ntim1b.b4a.run'
-      : window.location.origin);
+    : 'https://olx-12ntim1b.b4a.run';
 
   const fetchWhatsapp = async () => {
     try {
@@ -265,16 +270,18 @@ function App() {
         {showTutorial && (
           <TutorialStep
             step={tutorialStep}
-            onNext={() => {
+            onNext={(skipForever) => {
               if (tutorialStep < 2) setTutorialStep(tutorialStep + 1);
               else {
                 setShowTutorial(false);
-                localStorage.setItem('last_seen_version', APP_VERSION);
+                sessionStorage.setItem('tutorial_shown', 'true');
+                if (skipForever) localStorage.setItem('tutorial_disabled', 'true');
               }
             }}
-            onSkip={() => {
+            onSkip={(skipForever) => {
               setShowTutorial(false);
-              localStorage.setItem('last_seen_version', APP_VERSION);
+              sessionStorage.setItem('tutorial_shown', 'true');
+              if (skipForever) localStorage.setItem('tutorial_disabled', 'true');
             }}
           />
         )}
@@ -669,9 +676,11 @@ function SplashScreen({ version }) {
 }
 
 function TutorialStep({ step, onNext, onSkip }) {
+  const [dontShowAgain, setDontShowAgain] = useState(false);
+
   const steps = [
     {
-      title: "🚀 Bem-vindo ao OpenHouses!",
+      title: "🚀 Bem-vido ao OpenHouses!",
       content: "Este robô monitora a OLX de Alphaville e arredores para encontrar as melhores oportunidades de imóveis direto com proprietários.",
       icon: <RefreshCw size={32} color="white" />
     },
@@ -712,15 +721,25 @@ function TutorialStep({ step, onNext, onSkip }) {
         <h2 style={{ marginBottom: '15px', fontWeight: 800 }}>{steps[step].title}</h2>
         <p style={{ color: 'var(--text-muted)', lineHeight: '1.6', marginBottom: '30px' }}>{steps[step].content}</p>
 
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '20px', cursor: 'pointer' }} onClick={() => setDontShowAgain(!dontShowAgain)}>
+          <input
+            type="checkbox"
+            checked={dontShowAgain}
+            onChange={() => { }}
+            style={{ width: '16px', height: '16px', accentColor: 'var(--primary)' }}
+          />
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>Não mostrar mais nas próximas vezes</span>
+        </div>
+
         <div style={{ display: 'flex', gap: '10px' }}>
           <button
-            onClick={onSkip}
+            onClick={() => onSkip(dontShowAgain)}
             style={{ flex: 1, padding: '12px', borderRadius: '10px', background: 'transparent', color: 'var(--text-muted)', border: '1px solid rgba(255,255,255,0.1)' }}
           >
             Pular Tudo
           </button>
           <button
-            onClick={onNext}
+            onClick={() => onNext(dontShowAgain)}
             style={{ flex: 2, padding: '12px', borderRadius: '10px', background: 'var(--primary)', color: 'white', fontWeight: 800 }}
           >
             {step === 2 ? "Finalizar" : "Próximo"}
@@ -767,58 +786,93 @@ function ListingCard({ listing, onUpdate }) {
         </div>
       )}
 
-      {/* Telefone Clicável */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <a
-          href={`tel:${phone ? phone.replace(/\D/g, '') : ''}`}
-          style={{
-            color: 'var(--text-main)',
-            textDecoration: 'none',
-            fontWeight: 700,
-            fontSize: '1rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: 'rgba(255,255,255,0.05)',
-            padding: '6px 14px',
-            borderRadius: '8px',
-            transition: 'all 0.2s'
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
-          onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
-        >
-          <Smartphone size={16} color="var(--primary)" />
-          {phone}
-        </a>
+      {/* Telefone e Info Imóvel */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        {/* Título (se houver) */}
+        {listing.get("title") && (
+          <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '400px' }}>
+            {listing.get("title")}
+          </div>
+        )}
 
-        {/* Nome e Data/Hora */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-          {(contactName && contactName !== 'Desconhecido') && (
-            <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600 }}>
-              {contactName}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <a
+            href={`tel:${phone ? phone.replace(/\D/g, '') : ''}`}
+            style={{
+              color: 'var(--text-main)',
+              textDecoration: 'none',
+              fontWeight: 700,
+              fontSize: '1rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              background: 'rgba(255,255,255,0.05)',
+              padding: '6px 14px',
+              borderRadius: '8px',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+          >
+            <Smartphone size={16} color="var(--primary)" />
+            {phone}
+          </a>
+
+          {/* Badges de Detalhes */}
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem' }}>
+            {listing.get("rooms") && (
+              <span title="Quartos" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Home size={14} /> {listing.get("rooms").replace(/\D/g, '')}
+              </span>
+            )}
+            {listing.get("area") && (
+              <span title="Área" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Maximize size={14} /> {listing.get("area")}
+              </span>
+            )}
+            {listing.get("garage") && (
+              <span title="Vagas" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Layout size={14} /> {listing.get("garage").replace(/\D/g, '')}
+              </span>
+            )}
+            {listing.get("condo") && (
+              <span title="Condomínio" style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>
+                Cond: {listing.get("condo")}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Localização e Data */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.7rem' }}>
+          {listing.get("location") && (
+            <span style={{ color: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <MapPin size={12} /> {listing.get("location").split(',').slice(0, 2).join(',')}
             </span>
           )}
-          <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.7rem', fontWeight: 500 }}>
+
+          <span style={{ color: 'rgba(255,255,255,0.2)', fontWeight: 500 }}>
             {(() => {
               const capDate = listing.get("capturedAt") || listing.get("lastUpdated");
               if (!capDate) return '-';
-
               let isoStr = '';
-              if (typeof capDate === 'string') {
-                isoStr = capDate;
-              } else if (capDate && typeof capDate === 'object' && capDate.iso) {
-                isoStr = capDate.iso;
-              }
+              if (typeof capDate === 'string') isoStr = capDate;
+              else if (capDate && typeof capDate === 'object' && capDate.iso) isoStr = capDate.iso;
 
               if (isoStr) {
                 const dt = DateTime.fromISO(isoStr);
                 return dt.isValid ? dt.toFormat('dd/MM/yyyy HH:mm') : '-';
               }
-
               const dtJS = DateTime.fromJSDate(capDate);
               return dtJS.isValid ? dtJS.toFormat('dd/MM/yyyy HH:mm') : '-';
             })()}
           </span>
+
+          {(contactName && contactName !== 'Desconhecido') && (
+            <span style={{ color: 'var(--primary)', fontWeight: 600, opacity: 0.6 }}>
+              • {contactName}
+            </span>
+          )}
         </div>
       </div>
 

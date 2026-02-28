@@ -486,6 +486,14 @@ async function saveSingleListing(item) {
         listing.set("phone", item.telefone);
         listing.set("waLink", generateWhatsAppLink(item.telefone));
         listing.set("contactName", item.contactName || "Desconhecido");
+        listing.set("title", item.title);
+        listing.set("rooms", item.rooms);
+        listing.set("area", item.area);
+        listing.set("garage", item.garage);
+        listing.set("bathrooms", item.bathrooms);
+        listing.set("iptu", item.iptu);
+        listing.set("condo", item.condo);
+        listing.set("location", item.location);
         listing.set("lastUpdated", new Date());
         if (isNew) {
             listing.set("status", "active");
@@ -610,31 +618,69 @@ async function scrape(limit = 50, foundLinks = [], newResults = []) {
                     }
 
                     const data = await page.evaluate(() => {
-                        // Seletor de preço atualizado baseado no price-box
                         const priceEl = document.querySelector('#price-box-container span.typo-title-medium') ||
                             document.querySelector('h2[data-testid="ad-price"]') ||
                             document.querySelector('.price-value') ||
                             document.querySelector('span.price');
 
                         const bodyText = document.body.innerText;
-                        // Regex melhorada para pegar telefones com/sem DDD e espaços
                         const phoneMatch = bodyText.match(/(?:\(?\d{2}\)?\s?)?(?:9\s?)?\d{4}[-\s]?\d{4}/g);
-                        // Filtra o melhor match (geralmente o que tem DDD ou 11 dígitos)
                         const bestPhone = phoneMatch ? phoneMatch.sort((a, b) => b.length - a.length)[0] : "Não informado";
 
                         const sellerEl = document.querySelector('span.typo-body-large.ad__sc-ypp2u2-4') ||
                             document.querySelector('span[data-testid="ad-seller-name"]') ||
                             document.querySelector('div[data-testid="profile-card"] h2');
 
+                        const titleEl = document.querySelector('h1[data-testid="ad-title"]') || document.querySelector('h1') || document.querySelector('.ad__sc-1q24z96-0');
+
+                        // Extração de Detalhes (Quartos, Área, Vagas, Banheiros)
+                        const getDetail = (text) => {
+                            const details = Array.from(document.querySelectorAll('div[data-testid="ad-properties"] div, #details div'));
+                            const found = details.find(el => el.innerText.includes(text));
+                            if (!found) return null;
+                            const value = found.querySelector('a') || found.querySelector('span:last-child');
+                            return value ? value.innerText.trim() : null;
+                        };
+
+                        const priceBoxText = document.querySelector('#price-box-container')?.innerText || "";
+                        const getPriceBoxDetail = (label) => {
+                            const match = priceBoxText.match(new RegExp(`${label}\\s*R\\$\\s*([\\d.]+)`, 'i'));
+                            return match ? `R$ ${match[1]}` : null;
+                        };
+
+                        const locationEl = document.querySelector('div[data-testid="ad-location-details-container"]') ||
+                            document.querySelector('.ad__sc-1m38784-0');
+
                         return {
+                            title: titleEl ? titleEl.innerText.trim() : "Sem Título",
                             price: priceEl ? priceEl.innerText.trim() : "N/A",
                             phone: bestPhone,
-                            contactName: sellerEl ? sellerEl.innerText.trim() : "Desconhecido"
+                            contactName: sellerEl ? sellerEl.innerText.trim() : "Desconhecido",
+                            rooms: getDetail("Quartos"),
+                            area: getDetail("Área útil") || getDetail("Área construída"),
+                            garage: getDetail("Vagas na garagem"),
+                            bathrooms: getDetail("Banheiros"),
+                            iptu: getPriceBoxDetail("IPTU"),
+                            condo: getPriceBoxDetail("Condomínio"),
+                            location: locationEl ? locationEl.innerText.replace("Exibir no mapa", "").trim() : "Localização não disponível"
                         };
                     });
 
-                    console.log(`💎 Extraído: ${data.price} | Fone: ${data.phone}`);
-                    const scrapedItem = { link: adUrl, valor: data.price, telefone: data.phone, contactName: data.contactName };
+                    console.log(`💎 Extraído: ${data.price} | Título: ${data.title}`);
+                    const scrapedItem = {
+                        link: adUrl,
+                        valor: data.price,
+                        telefone: data.phone,
+                        contactName: data.contactName,
+                        title: data.title,
+                        rooms: data.rooms,
+                        area: data.area,
+                        garage: data.garage,
+                        bathrooms: data.bathrooms,
+                        iptu: data.iptu,
+                        condo: data.condo,
+                        location: data.location
+                    };
                     allData.push(scrapedItem);
                     foundLinks.push(adUrl);
                     const isNewEntry = await saveSingleListing(scrapedItem);
