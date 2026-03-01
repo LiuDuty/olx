@@ -76,9 +76,11 @@ function App() {
     }
   }, [filter, showSplash, showTutorial]);
 
-  const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  const API_BASE_URL = (window.location.hostname.includes('localhost') || window.location.hostname.includes('127.0.0.1'))
     ? 'http://localhost:3000'
-    : ''; // Vazio para produção (mesmo domínio)
+    : (window.location.hostname.includes('vercel.app')
+      ? 'https://olx-12ntim1b.b4a.app'
+      : ''); // Monolito (mesmo domínio)
 
   const fetchWhatsapp = async () => {
     try {
