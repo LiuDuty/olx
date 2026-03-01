@@ -1,6 +1,6 @@
 FROM node:18-bookworm-slim
 
-# Instalar apenas o básico para o Node
+# Dependências básicas
 RUN apt-get update && apt-get install -y \
     procps \
     --no-install-recommends \
@@ -8,15 +8,24 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Instalar dependências
+# Instala dependências do Scraper
 COPY package*.json ./
 RUN npm install
 
-# Copiar código
+# Build da Interface (Frontend)
+COPY frontend/package*.json ./frontend/
+RUN cd frontend && npm install
+COPY frontend/ ./frontend/
+RUN cd frontend && npm run build
+
+# Copia o restante do código (scraper, db.js, etc)
 COPY . .
 
-# Porta 7860 (Hugging Face Default)
+# Porta padrão
 EXPOSE 3000
 
-# Iniciar
+ENV PORT=3000
+ENV NODE_ENV=production
+
+# Comando para iniciar
 CMD ["node", "scraper.js"]

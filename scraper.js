@@ -51,9 +51,10 @@ app.use((req, res, next) => {
     next();
 });
 
-// Check de Saúde
-app.get('/', (req, res) => res.send('🚀 OLX Backend API is Online!'));
+// Serve Frontend estático
+app.use(express.static(path.join(__dirname, 'frontend/dist')));
 
+// Check de Saúde
 app.get('/api/health', (req, res) => res.json({
     status: 'API Online',
     serverTime: new Date(),
@@ -135,11 +136,11 @@ app.get('/api/status', async (req, res) => {
 app.get('/api/config', async (req, res) => {
     try {
         const Config = Parse.Object.extend("Config");
-        const query = new Parse.Query(Config);
-        const configs = await query.find(getOptions());
-        const result = {};
-        configs.forEach(c => result[c.get("key")] = c.get("value"));
-        res.json(result);
+        const results = {};
+        // Nossa implementação do db.json guarda configs num objeto simples
+        // Para o frontend, precisamos das chaves next_run, limit_enabled, limit_value
+        const data = JSON.parse(fs.readFileSync(path.join(__dirname, 'db.json'), 'utf8'));
+        res.json(data.config);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -275,12 +276,13 @@ app.listen(PORT, '0.0.0.0', () => {
     const SELF_URL = process.env.APP_URL || `http://localhost:${PORT}`;
     setInterval(() => {
         if (SELF_URL.includes('localhost')) return;
-        console.log(`📡 [Keep-Alive] Ping em ${SELF_URL}`);
-        const protocol = SELF_URL.startsWith('https') ? https : require('http');
-        protocol.get(SELF_URL, () => { }).on('error', (err) => {
-            console.error(`❌ [Keep-Alive] Erro: ${err.message}`);
-        });
     }, 5 * 60 * 1000);
+});
+
+// Rota fallback para o React (SPA)
+app.get('*', (req, res) => {
+    if (req.path.startsWith('/api') || req.path === '/qr') return;
+    res.sendFile(path.join(__dirname, 'frontend/dist/index.html'));
 });
 
 // ==========================================
