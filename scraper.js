@@ -24,7 +24,7 @@ chromium.use(stealth);
 // CONFIGURAÇÃO
 // ==========================================
 const TELEFONE_DESTINO = process.env.TELEFONE_DESTINO || '5511975040117';
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 7860;
 const BROWSERLESS_TOKEN = process.env.BROWSERLESS_TOKEN || '2U1KDYckXbPO4pc065f0e047f92f67e4ab2dbe8e65ac0fd55';
 const BROWSERLESS_WS = `wss://chrome.browserless.io?token=${BROWSERLESS_TOKEN}`;
 

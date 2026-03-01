@@ -21,10 +21,10 @@ RUN cd frontend && npm run build
 # Copia o restante do código (scraper, db.js, etc)
 COPY . .
 
-# Porta padrão
-EXPOSE 3000
+# Porta padrão (Hugging Face)
+EXPOSE 7860
 
-ENV PORT=3000
+ENV PORT=7860
 ENV NODE_ENV=production
 
 # Comando para iniciar
