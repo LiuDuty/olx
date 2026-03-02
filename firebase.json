@@ -1,6 +1,6 @@
 {
     "hosting": {
-        "site": "radarweb",
+        "site": "radarolx",
         "public": "frontend/dist",
         "ignore": [
             "firebase.json",
