@@ -26,6 +26,7 @@
     "cors": "^2.8.6",
     "dotenv": "^16.4.1",
     "express": "^5.2.1",
+    "firebase-admin": "^13.7.0",
     "luxon": "^3.4.4",
     "node-cron": "^4.2.1",
     "parse": "^5.3.0",

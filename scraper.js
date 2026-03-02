@@ -1,3 +1,4 @@
+require('dotenv').config();
 const { chromium } = require('playwright-extra');
 const stealth = require('puppeteer-extra-plugin-stealth')();
 const fs = require('fs');
@@ -61,10 +62,10 @@ app.get('/api/health', (req, res) => res.json({
     serverTime: new Date()
 }));
 
-app.get('/api/whatsapp-status', (req, res) => {
+app.get('/api/whatsapp-status', async (req, res) => {
     try {
-        const data = JSON.parse(fs.readFileSync(path.join(__dirname, 'db.json'), 'utf8'));
-        res.json(data.whatsapp || { status: 'Desconectado', hasQr: false });
+        const status = await Parse.getWhatsAppStatus();
+        res.json(status);
     } catch (e) {
         res.json({ status: 'Erro ao ler status', hasQr: false });
     }
@@ -73,27 +74,23 @@ app.get('/api/whatsapp-status', (req, res) => {
 // ==========================================
 // PÁGINA DO QR CODE (Lê do DB compartilhado)
 // ==========================================
-app.get('/qr', (req, res) => {
-    let whatsapp = { status: 'Iniciando...', hasQr: false, lastQr: null };
+app.get('/qr', async (req, res) => {
     try {
-        const data = JSON.parse(fs.readFileSync(path.join(__dirname, 'db.json'), 'utf8'));
-        if (data.whatsapp) whatsapp = data.whatsapp;
-    } catch (e) { }
-
-    if (!whatsapp.hasQr || !whatsapp.lastQr) {
-        return res.send(`<!DOCTYPE html>
+        const whatsapp = await Parse.getWhatsAppStatus();
+        if (!whatsapp.hasQr || !whatsapp.lastQr) {
+            return res.send(`<!DOCTYPE html>
 <html><head><title>WhatsApp QR</title></head>
 <body style="text-align:center;padding:50px;font-family:Arial;background:#fff;">
     <h2>🤖 Status: ${whatsapp.status}</h2>
     <p>Aguardando QR Code... Atualizando em 3 segundos.</p>
     <script>setTimeout(()=>location.reload(),3000)</script>
 </body></html>`);
-    }
+        }
 
-    // Usa JSON.stringify para escapar o QR de forma segura
-    const qrJson = JSON.stringify(whatsapp.lastQr);
+        // Usa JSON.stringify para escapar o QR de forma segura
+        const qrJson = JSON.stringify(whatsapp.lastQr);
 
-    res.send(`<!DOCTYPE html>
+        res.send(`<!DOCTYPE html>
 <html>
 <head>
     <title>WhatsApp QR Code</title>
@@ -124,6 +121,9 @@ app.get('/qr', (req, res) => {
     </script>
 </body>
 </html>`);
+    } catch (e) {
+        res.status(500).send("Erro ao carregar status do WhatsApp");
+    }
 });
 
 // ==========================================
@@ -146,12 +146,12 @@ app.get('/api/status', async (req, res) => {
 
 app.get('/api/config', async (req, res) => {
     try {
-        const Config = Parse.Object.extend("Config");
-        const results = {};
-        // Nossa implementação do db.json guarda configs num objeto simples
-        // Para o frontend, precisamos das chaves next_run, limit_enabled, limit_value
-        const data = JSON.parse(fs.readFileSync(path.join(__dirname, 'db.json'), 'utf8'));
-        res.json(data.config);
+        const data = {
+            next_run: await Parse.getConfig('next_run'),
+            limit_enabled: await Parse.getConfig('limit_enabled'),
+            limit_value: await Parse.getConfig('limit_value')
+        };
+        res.json(data);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -275,8 +275,7 @@ app.post('/api/run-now', async (req, res) => {
     // Se não veio filtros no body, tenta carregar do DB
     if (!filters) {
         try {
-            const data = JSON.parse(fs.readFileSync(path.join(__dirname, 'db.json'), 'utf8'));
-            filters = data.scraperFilters;
+            filters = await Parse.getScraperFilters();
         } catch (e) {
             filters = null;
         }
@@ -287,25 +286,18 @@ app.post('/api/run-now', async (req, res) => {
     res.json({ message: `Scraper iniciado com limite de ${limit} itens` });
 });
 
-app.get('/api/scraper-filters', (req, res) => {
+app.get('/api/scraper-filters', async (req, res) => {
     try {
-        const data = JSON.parse(fs.readFileSync(path.join(__dirname, 'db.json'), 'utf8'));
-        res.json(data.scraperFilters || {
-            regions: ['tambore'],
-            types: ['venda'],
-            priceMin: 5000000,
-            priceMax: 50000000
-        });
+        const filters = await Parse.getScraperFilters();
+        res.json(filters);
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
 });
 
-app.post('/api/scraper-filters', (req, res) => {
+app.post('/api/scraper-filters', async (req, res) => {
     try {
-        const data = JSON.parse(fs.readFileSync(path.join(__dirname, 'db.json'), 'utf8'));
-        data.scraperFilters = req.body;
-        fs.writeFileSync(path.join(__dirname, 'db.json'), JSON.stringify(data, null, 2));
+        await Parse.setScraperFilters(req.body);
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -372,8 +364,7 @@ setInterval(async () => {
                 // Carrega filtros para execução agendada
                 let runFilters = null;
                 try {
-                    const data = JSON.parse(fs.readFileSync(path.join(__dirname, 'db.json'), 'utf8'));
-                    runFilters = data.scraperFilters;
+                    runFilters = await Parse.getScraperFilters();
                 } catch (e) { }
 
                 ejetaScraper(runLimit, runFilters);

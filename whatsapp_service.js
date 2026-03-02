@@ -41,20 +41,10 @@ const client = new Client({
 });
 
 async function updateWhatsAppStatus(status, hasQr = false, qrData = null) {
-    const DB_FILE = path.join(__dirname, 'db.json');
-    if (!fs.existsSync(DB_FILE)) return;
-
     try {
-        const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-        data.whatsapp = {
-            status,
-            hasQr,
-            lastQr: qrData,
-            updatedAt: new Date().toISOString()
-        };
-        fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
+        await db.updateWhatsAppStatus(status, hasQr, qrData);
     } catch (e) {
-        console.error('Erro ao atualizar status do WhatsApp no DB:', e.message);
+        console.error('Erro ao atualizar status do WhatsApp no Firebase:', e.message);
     }
 }
 

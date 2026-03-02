@@ -1,65 +1,108 @@
-const fs = require('fs');
+const admin = require('firebase-admin');
 const path = require('path');
+const fs = require('fs');
 
-const DB_FILE = path.join(__dirname, 'db.json');
-
-// Inicializa o arquivo se não existir
-if (!fs.existsSync(DB_FILE)) {
-    fs.writeFileSync(DB_FILE, JSON.stringify({
-        listings: [],
-        config: {
-            next_run: null,
-            limit_enabled: "true",
-            limit_value: "50"
-        },
-        status: {
-            message: "Aguardando...",
-            progress: 0,
-            currentItem: null,
-            links: []
-        },
-        whatsapp: {
-            status: "Iniciando...",
-            hasQr: false,
-            lastQr: null
-        }
-    }, null, 2));
+// Inicializa o Firebase Admin
+let serviceAccount;
+try {
+    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+        serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    } else {
+        serviceAccount = require('./firebase-key.json');
+    }
+} catch (e) {
+    console.error("❌ ERRO GRAVE: Credenciais do Firebase ausentes. Verifique FIREBASE_SERVICE_ACCOUNT no .env ou firebase-key.json", e.message);
+    process.exit(1);
 }
 
-const readDb = () => JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-const writeDb = (data) => fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
+if (!admin.apps.length) {
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+    });
+}
+
+const firestore = admin.firestore();
+
+// Helper para converter timestamp do Firebase para Date
+const toDate = (val) => {
+    if (!val) return null;
+    if (val.toDate) return val.toDate();
+    if (val instanceof Date) return val;
+    return new Date(val);
+};
 
 const db = {
-    // Simulando interface do Parse para minimizar mudanças no scraper.js
+    firestore,
+
+    // Interface mock do Parse para manter compatibilidade
     Object: {
         extend: (className) => {
             const Cls = class {
                 constructor() {
                     this.className = className;
                     this.attributes = {};
+                    this.id = null;
                 }
                 get(key) { return this.attributes[key]; }
                 set(key, val) { this.attributes[key] = val; }
+
                 async save() {
-                    const data = readDb();
+                    let collectionName = "";
+                    let docId = this.id;
+
                     if (className === "Listing") {
-                        const idx = data.listings.findIndex(l => l.link === this.attributes.link);
-                        if (idx >= 0) data.listings[idx] = this.attributes;
-                        else {
-                            this.attributes.id = this.attributes.objectId = Math.random().toString(36).substring(2, 11);
-                            data.listings.push(this.attributes);
+                        collectionName = "listings";
+                        // Se não tem ID, tenta usar o link como base para evitar duplicatas
+                        if (!docId && this.attributes.link) {
+                            docId = Buffer.from(this.attributes.link.split('?')[0]).toString('base64').replace(/[/+=]/g, '');
                         }
                     } else if (className === "Config") {
-                        data.config[this.attributes.key] = this.attributes.value;
+                        collectionName = "configs";
+                        docId = this.attributes.key;
                     } else if (className === "ScraperStatus") {
-                        data.status = this.attributes;
+                        collectionName = "system";
+                        docId = "status";
                     }
-                    writeDb(data);
+
+                    const data = { ...this.attributes };
+                    // Converter datas
+                    Object.keys(data).forEach(k => {
+                        if (data[k] instanceof Date) {
+                            data[k] = admin.firestore.Timestamp.fromDate(data[k]);
+                        }
+                    });
+
+                    const ref = firestore.collection(collectionName).doc(docId || undefined);
+                    await ref.set(data, { merge: true });
+                    this.id = ref.id;
+                    this.attributes.id = this.id;
+                    this.attributes.objectId = this.id;
                 }
-                toJSON() { return { ...this.attributes, objectId: this.attributes.objectId || this.attributes.id }; }
+
+                toJSON() {
+                    const data = { ...this.attributes, objectId: this.id || this.attributes.objectId };
+                    Object.keys(data).forEach(k => {
+                        if (data[k] && data[k].toDate) data[k] = data[k].toDate();
+                    });
+                    return data;
+                }
             };
             Cls.className = className;
             return Cls;
+        },
+
+        destroyAll: async (objects) => {
+            const batch = firestore.batch();
+            objects.forEach(obj => {
+                let col = "";
+                if (obj.className === "Listing") col = "listings";
+                else if (obj.className === "Config") col = "configs";
+
+                if (col && obj.id) {
+                    batch.delete(firestore.collection(col).doc(obj.id));
+                }
+            });
+            await batch.commit();
         }
     },
 
@@ -68,27 +111,23 @@ const db = {
             this.className = typeof target === 'string' ? target : target.className;
             this.filters = [];
             this.sortField = null;
+            this.sortOrder = 'desc';
             this.limitVal = 1000;
         }
 
         equalTo(key, value) {
-            this.filters.push(item => {
-                const itemVal = item[key];
-                return itemVal === value;
-            });
+            this.filters.push({ key, op: '==', value });
             return this;
         }
 
         notEqualTo(key, value) {
-            this.filters.push(item => {
-                const itemVal = item[key];
-                return itemVal !== value;
-            });
+            this.filters.push({ key, op: '!=', value });
             return this;
         }
 
         descending(key) {
             this.sortField = key;
+            this.sortOrder = 'desc';
             return this;
         }
 
@@ -102,104 +141,127 @@ const db = {
             return results.length > 0 ? results[0] : null;
         }
 
-        wrap(obj, className) {
-            if (!obj) return null;
-            const ExtendedClass = db.Object.extend(className);
-            const wrapper = new ExtendedClass();
-            wrapper.attributes = obj;
-            if (!wrapper.attributes.objectId && wrapper.attributes.id) {
-                wrapper.attributes.objectId = wrapper.attributes.id;
-            }
-            return wrapper;
+        async get(id) {
+            let col = "listings";
+            if (this.className === "Config") col = "configs";
+
+            const doc = await firestore.collection(col).doc(id).get();
+            if (!doc.exists) throw new Error("Not found");
+
+            const ExtendedClass = db.Object.extend(this.className);
+            const obj = new ExtendedClass();
+            obj.id = doc.id;
+            obj.attributes = doc.data();
+            return obj;
         }
 
         async find() {
-            const data = readDb();
-            let results = [];
-            if (this.className === "Listing") {
-                results = data.listings.filter(item => {
-                    return this.filters.every(f => f(item));
-                });
-                if (this.sortField) {
-                    results.sort((a, b) => new Date(b[this.sortField]) - new Date(a[this.sortField]));
-                }
-                return results.slice(0, this.limitVal).map(r => this.wrap(r, "Listing"));
-            } else if (this.className === "Config") {
-                // Para Config, retornamos um array de objetos { key, value } baseados no data.config
-                return Object.entries(data.config).map(([key, value]) => {
-                    const ConfigClass = db.Object.extend("Config");
-                    const obj = new ConfigClass();
-                    obj.set("key", key);
-                    obj.set("value", value);
-                    return obj;
-                }).filter(item => this.filters.every(f => f(item.attributes)));
-            } else if (this.className === "ScraperStatus") {
-                const StatusClass = db.Object.extend("ScraperStatus");
-                const obj = new StatusClass();
-                Object.entries(data.status).forEach(([k, v]) => obj.set(k, v));
-                const results = [obj];
-                return results.filter(item => this.filters.every(f => f(item.attributes)));
+            let collectionName = "";
+            if (this.className === "Listing") collectionName = "listings";
+            else if (this.className === "Config") collectionName = "configs";
+            else if (this.className === "ScraperStatus") collectionName = "system";
+
+            let query = firestore.collection(collectionName);
+
+            // Se for ScraperStatus, sempre retorna o doc 'status'
+            if (this.className === "ScraperStatus") {
+                const doc = await query.doc("status").get();
+                if (!doc.exists) return [];
+                const ExtendedClass = db.Object.extend("ScraperStatus");
+                const obj = new ExtendedClass();
+                obj.id = "status";
+                obj.attributes = doc.data();
+                return [obj];
             }
-            return [];
+
+            this.filters.forEach(f => {
+                query = query.where(f.key, f.op, f.value);
+            });
+
+            // Firestore exige índice composto para where() + orderBy() em campos diferentes.
+            // Quando há filtros, aplicamos apenas o limit no Firestore e ordenamos em memória.
+            const hasFilters = this.filters.length > 0;
+
+            if (this.sortField && !hasFilters) {
+                // Sem filtros: ordenação nativa no Firestore
+                query = query.orderBy(this.sortField, this.sortOrder);
+            }
+
+            query = query.limit(this.limitVal);
+
+            const snapshot = await query.get();
+            const ExtendedClass = db.Object.extend(this.className);
+
+            let results = snapshot.docs.map(doc => {
+                const obj = new ExtendedClass();
+                obj.id = doc.id;
+                obj.attributes = doc.data();
+                return obj;
+            });
+
+            // Ordenação em memória quando há filtros (evita índice composto)
+            if (this.sortField && hasFilters) {
+                results.sort((a, b) => {
+                    const va = a.attributes[this.sortField];
+                    const vb = b.attributes[this.sortField];
+                    const toMs = (v) => {
+                        if (!v) return 0;
+                        if (v && v.toDate) return v.toDate().getTime();
+                        if (v instanceof Date) return v.getTime();
+                        return new Date(v).getTime() || 0;
+                    };
+                    const diff = toMs(va) - toMs(vb);
+                    return this.sortOrder === 'desc' ? -diff : diff;
+                });
+            }
+
+            return results;
         }
 
         async count() {
             const items = await this.find();
             return items.length;
         }
-
-        async get(id) {
-            const data = readDb();
-            const item = data.listings.find(l => (l.objectId || l.id) === id);
-            if (!item) throw new Error("Not found");
-            return this.wrap(item, "Listing");
-        }
-
-        wrap(obj, className) {
-            if (!obj) return null;
-            return {
-                id: obj.objectId || obj.id,
-                attributes: obj,
-                get: (key) => obj[key],
-                set: (key, val) => { obj[key] = val },
-                save: async () => {
-                    const data = readDb();
-                    if (className === "Listing") {
-                        const idx = data.listings.findIndex(l => l.link === obj.link);
-                        if (idx >= 0) data.listings[idx] = obj;
-                        else {
-                            obj.objectId = Math.random().toString(36).substring(2, 11);
-                            data.listings.push(obj);
-                        }
-                    } else if (className === "ScraperStatus") {
-                        data.status = obj;
-                    }
-                    writeDb(data);
-                },
-                toJSON: () => {
-                    return { ...obj, objectId: obj.objectId || obj.id };
-                }
-            };
-        }
     },
 
-    // Funções auxiliares para uso direto no scraper.js
+    // Funções auxiliares específicas
     async getConfig(key) {
-        const data = readDb();
-        return data.config[key];
+        const doc = await firestore.collection('configs').doc(key).get();
+        return doc.exists ? doc.data().value : null;
     },
 
     async setConfig(key, value) {
-        const data = readDb();
-        data.config[key] = value;
-        writeDb(data);
+        await firestore.collection('configs').doc(key).set({ key, value: String(value) }, { merge: true });
     },
 
-    async destroyAll(objects) {
-        const data = readDb();
-        const linksToRemove = objects.map(o => o.get("link"));
-        data.listings = data.listings.filter(l => !linksToRemove.includes(l.link));
-        writeDb(data);
+    // WhatsApp Status (Migrado para Firestore)
+    async updateWhatsAppStatus(status, hasQr = false, qrData = null) {
+        await firestore.collection('system').doc('whatsapp').set({
+            status,
+            hasQr,
+            lastQr: qrData,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+    },
+
+    async getWhatsAppStatus() {
+        const doc = await firestore.collection('system').doc('whatsapp').get();
+        return doc.exists ? doc.data() : { status: 'Desconectado', hasQr: false };
+    },
+
+    // Scraper Filters (Migrado para Firestore)
+    async getScraperFilters() {
+        const doc = await firestore.collection('system').doc('filters').get();
+        return doc.exists ? doc.data() : {
+            regions: ['tambore'],
+            types: ['venda'],
+            priceMin: 5000000,
+            priceMax: 50000000
+        };
+    },
+
+    async setScraperFilters(filters) {
+        await firestore.collection('system').doc('filters').set(filters, { merge: true });
     }
 };
 

@@ -85,7 +85,7 @@ function App() {
   }, [filter, showSplash, showTutorial, isScraping]);
 
   const API_BASE_URL = (window.location.hostname.includes('localhost') || window.location.hostname.includes('127.0.0.1'))
-    ? 'http://localhost:7860'
+    ? 'http://localhost:3000'
     : (window.location.hostname.includes('vercel.app')
       ? 'https://olx-12ntim1b.b4a.app'
       : ''); // Monolito (mesmo domínio)
@@ -359,7 +359,7 @@ function App() {
           <header className="header" style={{ marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
             <div>
               <h1 style={{ fontSize: '2rem', fontWeight: 800, background: 'linear-gradient(to right, #6366f1, #f43f5e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                OpenHouses Pro OLX
+                RadarWeb OLX
               </h1>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '5px' }}>
                 <span style={{
@@ -813,7 +813,7 @@ function SplashScreen({ version }) {
         }}>
           <RefreshCw size={40} color="white" className="spin" />
         </div>
-        <h1 style={{ fontSize: '2.5rem', fontWeight: 900, marginBottom: '5px' }}>OpenHouses Pro</h1>
+        <h1 style={{ fontSize: '2.5rem', fontWeight: 900, marginBottom: '5px' }}>RadarWeb</h1>
         <p style={{ color: 'var(--primary)', fontWeight: 700, letterSpacing: '2px' }}>V {version}</p>
         <div style={{ marginTop: '20px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Carregando seus dados...</div>
       </motion.div>
@@ -826,7 +826,7 @@ function TutorialStep({ step, onNext, onSkip }) {
 
   const steps = [
     {
-      title: "🚀 Bem-vido ao OpenHouses!",
+      title: "🚀 Bem-vindo ao RadarWeb!",
       content: "Este robô monitora a OLX de Alphaville e arredores para encontrar as melhores oportunidades de imóveis direto com proprietários.",
       icon: <RefreshCw size={32} color="white" />
     },
