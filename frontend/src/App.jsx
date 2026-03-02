@@ -356,7 +356,7 @@ function App() {
       {!showSplash && !showTutorial && (
         <>
           {/* Header */}
-          <header style={{ marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
+          <header className="header" style={{ marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
             <div>
               <h1 style={{ fontSize: '2rem', fontWeight: 800, background: 'linear-gradient(to right, #6366f1, #f43f5e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                 OpenHouses Pro OLX
@@ -528,7 +528,7 @@ function App() {
                   ⚙️ Configuração da Busca
                 </h4>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                <div className="filters-grid">
                   {/* Regiões */}
                   <div>
                     <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>📍 Regiões</p>
@@ -726,8 +726,8 @@ function App() {
           </AnimatePresence>
 
           {/* Search & Tabs */}
-          <div style={{ marginBottom: '25px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            <div style={{ position: 'relative' }}>
+          <div style={{ marginBottom: '25px' }}>
+            <div style={{ position: 'relative', marginBottom: '15px' }}>
               <Search style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={18} />
               <input
                 type="text"
@@ -738,7 +738,7 @@ function App() {
               />
             </div>
 
-            <div className="glass" style={{ display: 'flex', padding: '5px', gap: '5px' }}>
+            <div className="glass" style={{ display: 'flex', padding: '5px', gap: '5px', flexWrap: 'wrap' }}>
               {['active', 'favorites', 'ignored'].map(t => (
                 <button
                   key={t}
@@ -750,7 +750,8 @@ function App() {
                     background: filter === t ? 'rgba(255,255,255,0.1)' : 'transparent',
                     color: filter === t ? 'white' : 'var(--text-muted)',
                     fontWeight: 600,
-                    textTransform: 'capitalize'
+                    textTransform: 'capitalize',
+                    minWidth: '100px'
                   }}
                 >
                   {t === 'active' ? 'Todos' : t === 'favorites' ? 'Favoritos' : 'Ignorados'}

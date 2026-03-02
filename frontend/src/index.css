@@ -123,3 +123,88 @@ textarea:focus {
 ::-webkit-scrollbar-thumb:hover {
   background: #475569;
 }
+
+/* Mobile Responsiveness */
+@media (max-width: 600px) {
+  body {
+    padding: 10px;
+  }
+
+  header {
+    margin-bottom: 20px !important;
+  }
+
+  header h1 {
+    font-size: 1.6rem !important;
+    text-align: center;
+    width: 100%;
+  }
+
+  header>div {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px !important;
+    width: 100%;
+  }
+
+  /* Ajuste para os botões do cabeçalho caberem */
+  header button,
+  header .glass {
+    padding: 8px 12px !important;
+    font-size: 0.7rem !important;
+    flex: 1 1 auto;
+    /* Permite que cresçam e ocupem espaço disponível */
+    min-width: fit-content;
+  }
+
+  /* Reduzir largura do campo de limite no mobile */
+  header input[type="number"] {
+    width: 25px !important;
+  }
+
+  /* Grid de filtros em 1 coluna no mobile */
+  .filters-grid {
+    grid-template-columns: 1fr !important;
+    gap: 15px !important;
+  }
+
+  /* Tabs Navigation - manter em linha se couber, senão wrap */
+  .tabs-container {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 5px !important;
+  }
+
+  .tab-button {
+    padding: 10px 5px !important;
+    font-size: 0.75rem !important;
+  }
+
+  /* Listing Cards - Melhor aproveitamento de espaço */
+  .listing-card {
+    padding: 15px !important;
+  }
+
+  .listing-card-content {
+    flex-direction: column !important;
+    gap: 15px !important;
+  }
+
+  .listing-card-price {
+    font-size: 1.3rem !important;
+  }
+
+  .listing-card-details {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px !important;
+  }
+
+  .listing-card-actions {
+    display: flex !important;
+    justify-content: flex-end !important;
+    width: 100% !important;
+    margin-top: 10px;
+  }
+}
