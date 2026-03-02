@@ -316,6 +316,14 @@ app.post('/api/whatsapp-reset', async (req, res) => {
     }
 });
 
+// Fallback para o React (SPA) - Middleware simples para evitar problemas com regex no Express 5
+app.use((req, res, next) => {
+    if (req.path.startsWith('/api') || req.path === '/qr') {
+        return next();
+    }
+    res.sendFile(path.join(__dirname, 'frontend/dist/index.html'));
+});
+
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🌐 Servidor Web ativo na porta ${PORT}`);
 
@@ -326,11 +334,6 @@ app.listen(PORT, '0.0.0.0', () => {
     }, 5 * 60 * 1000);
 });
 
-// Fallback para o React (SPA) - Middleware simples para evitar problemas com regex no Express 5
-app.use((req, res) => {
-    if (req.path.startsWith('/api') || req.path === '/qr') return;
-    res.sendFile(path.join(__dirname, 'frontend/dist/index.html'));
-});
 
 // ==========================================
 // LOOP DE AGENDAMENTO
