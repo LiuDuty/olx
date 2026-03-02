@@ -86,9 +86,7 @@ function App() {
 
   const API_BASE_URL = (window.location.hostname.includes('localhost') || window.location.hostname.includes('127.0.0.1'))
     ? 'http://localhost:3000'
-    : (window.location.hostname.includes('vercel.app')
-      ? 'https://olx-12ntim1b.b4a.app'
-      : ''); // Monolito (mesmo domínio)
+    : 'https://olx-12ntim1b.b4a.app';
 
 
 
