@@ -1,5 +1,6 @@
 {
     "hosting": {
+        "site": "radarweb",
         "public": "frontend/dist",
         "ignore": [
             "firebase.json",
