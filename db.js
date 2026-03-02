@@ -17,6 +17,11 @@ if (!fs.existsSync(DB_FILE)) {
             progress: 0,
             currentItem: null,
             links: []
+        },
+        whatsapp: {
+            status: "Iniciando...",
+            hasQr: false,
+            lastQr: null
         }
     }, null, 2));
 }
@@ -27,12 +32,40 @@ const writeDb = (data) => fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2
 const db = {
     // Simulando interface do Parse para minimizar mudanças no scraper.js
     Object: {
-        extend: (className) => className
+        extend: (className) => {
+            const Cls = class {
+                constructor() {
+                    this.className = className;
+                    this.attributes = {};
+                }
+                get(key) { return this.attributes[key]; }
+                set(key, val) { this.attributes[key] = val; }
+                async save() {
+                    const data = readDb();
+                    if (className === "Listing") {
+                        const idx = data.listings.findIndex(l => l.link === this.attributes.link);
+                        if (idx >= 0) data.listings[idx] = this.attributes;
+                        else {
+                            this.attributes.id = this.attributes.objectId = Math.random().toString(36).substring(2, 11);
+                            data.listings.push(this.attributes);
+                        }
+                    } else if (className === "Config") {
+                        data.config[this.attributes.key] = this.attributes.value;
+                    } else if (className === "ScraperStatus") {
+                        data.status = this.attributes;
+                    }
+                    writeDb(data);
+                }
+                toJSON() { return { ...this.attributes, objectId: this.attributes.objectId || this.attributes.id }; }
+            };
+            Cls.className = className;
+            return Cls;
+        }
     },
 
     Query: class {
-        constructor(className) {
-            this.className = className;
+        constructor(target) {
+            this.className = typeof target === 'string' ? target : target.className;
             this.filters = [];
             this.sortField = null;
             this.limitVal = 1000;
@@ -40,10 +73,16 @@ const db = {
 
         equalTo(key, value) {
             this.filters.push(item => {
-                // No caso do JSON, campos como isFavorite são booleanos
-                const val = typeof value === 'string' ? value.toLowerCase() : value;
                 const itemVal = item[key];
                 return itemVal === value;
+            });
+            return this;
+        }
+
+        notEqualTo(key, value) {
+            this.filters.push(item => {
+                const itemVal = item[key];
+                return itemVal !== value;
             });
             return this;
         }
@@ -59,42 +98,19 @@ const db = {
         }
 
         async first() {
-            const data = readDb();
-            let obj = null;
-            if (this.className === "Listing") {
-                const results = await this.find();
-                obj = results.length > 0 ? results[0].attributes : null;
-            } else if (this.className === "Config") {
-                // Acha a chave no filtro: item => item.key === value
-                // Nossa implementação de first() para Config precisa identificar qual chave está sendo buscada
-                // No scraper usamos query.equalTo("key", "nome_da_chave")
-                // Como simplificação, vamos buscar no data.config
-                // Mas para ser fiel ao Parse, precisamos ver o filtro
-                // Vamos usar um truque: se houver um filtro do tipo k===v, pegamos v
-                const results = data.listings.filter(item => this.filters.every(f => f(item))); // Não serve para Config
-                // Config no db.json é { next_run: ..., ... }
-                // Vamos retornar um wrapper que aponta para a chave certa
-                return this.wrapConfig(data);
-            } else if (this.className === "ScraperStatus") {
-                return this.wrap(data.status, "ScraperStatus");
-            }
-            return obj ? this.wrap(obj, this.className) : null;
+            const results = await this.find();
+            return results.length > 0 ? results[0] : null;
         }
 
-        wrapConfig(data) {
-            // No scraper.js: let config = await query.first() || new Config(); config.set("value", val); await config.save();
-            // Precisamos saber QUAL chave. Como o scraper faz query.equalTo("key", "X") antes
-            // Vamos tentar capturar isso na Query
-            const keyFilter = this.keySearched;
-            if (!keyFilter) return null;
-
-            const val = data.config[keyFilter];
-            return {
-                get: (k) => k === "value" ? data.config[keyFilter] : keyFilter,
-                set: (k, v) => { if (k === "value") data.config[keyFilter] = v; },
-                save: async () => writeDb(data),
-                toJSON: () => ({ key: keyFilter, value: data.config[keyFilter] })
-            };
+        wrap(obj, className) {
+            if (!obj) return null;
+            const ExtendedClass = db.Object.extend(className);
+            const wrapper = new ExtendedClass();
+            wrapper.attributes = obj;
+            if (!wrapper.attributes.objectId && wrapper.attributes.id) {
+                wrapper.attributes.objectId = wrapper.attributes.id;
+            }
+            return wrapper;
         }
 
         async find() {
@@ -107,8 +123,24 @@ const db = {
                 if (this.sortField) {
                     results.sort((a, b) => new Date(b[this.sortField]) - new Date(a[this.sortField]));
                 }
+                return results.slice(0, this.limitVal).map(r => this.wrap(r, "Listing"));
+            } else if (this.className === "Config") {
+                // Para Config, retornamos um array de objetos { key, value } baseados no data.config
+                return Object.entries(data.config).map(([key, value]) => {
+                    const ConfigClass = db.Object.extend("Config");
+                    const obj = new ConfigClass();
+                    obj.set("key", key);
+                    obj.set("value", value);
+                    return obj;
+                }).filter(item => this.filters.every(f => f(item.attributes)));
+            } else if (this.className === "ScraperStatus") {
+                const StatusClass = db.Object.extend("ScraperStatus");
+                const obj = new StatusClass();
+                Object.entries(data.status).forEach(([k, v]) => obj.set(k, v));
+                const results = [obj];
+                return results.filter(item => this.filters.every(f => f(item.attributes)));
             }
-            return results.slice(0, this.limitVal).map(r => this.wrap(r, "Listing"));
+            return [];
         }
 
         async count() {

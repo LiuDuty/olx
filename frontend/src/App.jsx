@@ -34,16 +34,24 @@ function App() {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isScraping, setIsScraping] = useState(false);
+  const [showMonitor, setShowMonitor] = useState(false);
   const [filter, setFilter] = useState('active'); // active, favorites, ignored
   const [nextRun, setNextRun] = useState('');
   const [search, setSearch] = useState('');
   const [liveStatus, setLiveStatus] = useState({ message: 'Aguardando...', progress: 0, currentItem: null, links: [] });
-  const [whatsappStatus, setWhatsappStatus] = useState({ status: '...', hasQr: false });
+  // const [whatsappStatus, setWhatsappStatus] = useState({ status: '...', hasQr: false }); // WhatsApp Desabilitado
   const [showCalendar, setShowCalendar] = useState(false);
   const [limit, setLimit] = useState(3);
   const [limitEnabled, setLimitEnabled] = useState(false);
   const [scheduledTime, setScheduledTime] = useState('07:00');
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showFilters, setShowFilters] = useState(false);
+  const [scraperFilters, setScraperFilters] = useState({
+    regions: ['alphaville', 'tambore', 'barueri'],
+    types: ['venda'],
+    priceMin: 1000000,
+    priceMax: 50000000
+  });
 
   useEffect(() => {
     // Esconde splash após 2.5 segundos
@@ -63,35 +71,26 @@ function App() {
 
   useEffect(() => {
     if (!showSplash && !showTutorial) {
-      fetchListings();
       fetchConfig();
       fetchStatus();
-      fetchWhatsapp();
+
+      // Intervalo mais rápido se estiver extraindo (2s), senão 15s
+      const intervalTime = isScraping ? 2000 : 15000;
       const interval = setInterval(() => {
         fetchListings();
         fetchStatus();
-        fetchWhatsapp();
-      }, 15000);
+      }, intervalTime);
       return () => clearInterval(interval);
     }
-  }, [filter, showSplash, showTutorial]);
+  }, [filter, showSplash, showTutorial, isScraping]);
 
   const API_BASE_URL = (window.location.hostname.includes('localhost') || window.location.hostname.includes('127.0.0.1'))
-    ? 'http://localhost:3000'
+    ? 'http://localhost:7860'
     : (window.location.hostname.includes('vercel.app')
       ? 'https://olx-12ntim1b.b4a.app'
       : ''); // Monolito (mesmo domínio)
 
-  const fetchWhatsapp = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/whatsapp-status`);
-      if (!response.ok) throw new Error('Falha ao buscar status do WhatsApp');
-      const data = await response.json();
-      setWhatsappStatus(data);
-    } catch (error) {
-      console.error("Error fetching whatsapp status:", error);
-    }
-  };
+
 
   const fetchStatus = async () => {
     try {
@@ -105,10 +104,32 @@ function App() {
           currentItem: data.currentItem,
           links: data.links || []
         });
+
+        // Inteligência para manter o estado de scraping e monitor
+        const msg = data.message?.toLowerCase() || '';
+        const isError = msg.includes('erro') || msg.includes('bloqueio') || msg.includes('cloudflare');
+
         if (data.progress > 0 && data.progress < 100) {
           setIsScraping(true);
-        } else if (data.progress === 100 || data.progress === 0) {
+          setShowMonitor(true);
+        } else if (data.progress === 100) {
           setIsScraping(false);
+          // Se tiver links, garante que o monitor apareça (mesmo após refresh)
+          if (data.links?.length > 0) setShowMonitor(true);
+        } else if (isError) {
+          setIsScraping(false);
+          setShowMonitor(true); // Se teve erro, trava o monitor aberto
+        } else if (data.progress === 0) {
+          const isStarting = msg.includes('iniciando') || msg.includes('verificando') || msg.includes('conectando');
+          if (isStarting) {
+            setIsScraping(true);
+            setShowMonitor(true);
+          } else {
+            setIsScraping(false);
+            // Se tiver links de uma extração recém-finalizada, mantém aberto
+            if (data.links?.length > 0) setShowMonitor(true);
+            // Removida lógica de fechamento automático para evitar que suma da tela
+          }
         }
       }
     } catch (error) {
@@ -149,6 +170,45 @@ function App() {
     } catch (error) {
       console.error("Error fetching config:", error);
     }
+    // Carrega filtros do scraper
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/scraper-filters`);
+      if (res.ok) {
+        const f = await res.json();
+        setScraperFilters(f);
+      }
+    } catch (e) {
+      console.error("Error fetching scraper filters:", e);
+    }
+  };
+
+  const saveScraperFilters = async (newFilters) => {
+    setScraperFilters(newFilters);
+    try {
+      await fetch(`${API_BASE_URL}/api/scraper-filters`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newFilters)
+      });
+    } catch (e) {
+      console.error("Error saving scraper filters:", e);
+    }
+  };
+
+  const toggleRegion = (region) => {
+    const newRegions = scraperFilters.regions.includes(region)
+      ? scraperFilters.regions.filter(r => r !== region)
+      : [...scraperFilters.regions, region];
+    if (newRegions.length === 0) return; // pelo menos 1
+    saveScraperFilters({ ...scraperFilters, regions: newRegions });
+  };
+
+  const toggleType = (type) => {
+    const newTypes = scraperFilters.types.includes(type)
+      ? scraperFilters.types.filter(t => t !== type)
+      : [...scraperFilters.types, type];
+    if (newTypes.length === 0) return; // pelo menos 1
+    saveScraperFilters({ ...scraperFilters, types: newTypes });
   };
 
   const saveConfig = async (key, value) => {
@@ -181,12 +241,13 @@ function App() {
 
   const runScraper = async () => {
     setIsScraping(true);
+    setShowMonitor(true); // Abre o monitor imediatamente ao clicar
     try {
       const runLimit = limitEnabled ? parseInt(limit) : 999;
       const response = await fetch(`${API_BASE_URL}/api/run-now`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ limit: runLimit })
+        body: JSON.stringify({ limit: runLimit, filters: scraperFilters })
       });
 
       if (!response.ok) {
@@ -194,12 +255,15 @@ function App() {
         throw new Error(errData.error || 'Erro ao iniciar');
       }
 
-      alert(`Scraper iniciado! Limite: ${limitEnabled ? limit : 'Sem limite'}`);
+      const regioes = scraperFilters.regions.join(', ');
+      const tipos = scraperFilters.types.join(', ');
+      // Removido alert para não travar o monitor
+      console.log(`Scraper iniciado: ${regioes} | ${tipos}`);
     } catch (error) {
       console.error("Erro ao disparar scraper:", error);
       alert("Erro ao disparar scraper: " + error.message);
     } finally {
-      setTimeout(() => setIsScraping(false), 5000);
+      // Removido o timeout que resetava o estado erroneamente
     }
   };
 
@@ -312,33 +376,33 @@ function App() {
                   <Calendar size={14} />
                   AGENDADO: {nextRun ? DateTime.fromISO(nextRun).toFormat('dd/MM \'às\' HH:mm') : 'Não agendado'}
                 </span>
-
-                <a
-                  href={`${API_BASE_URL}/qr`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '4px 12px',
-                    background: whatsappStatus.status.includes('Pronto') ? 'rgba(34, 197, 94, 0.1)' : 'rgba(245, 158, 11, 0.1)',
-                    borderRadius: '20px',
-                    border: `1px solid ${whatsappStatus.status.includes('Pronto') ? 'rgba(34, 197, 94, 0.2)' : 'rgba(245, 158, 11, 0.2)'}`,
-                    color: whatsappStatus.status.includes('Pronto') ? '#22c55e' : '#f59e0b',
-                    fontWeight: 600,
-                    textDecoration: 'none',
-                    marginLeft: '10px'
-                  }}
-                >
-                  <Smartphone size={14} />
-                  WHATSAPP: {whatsappStatus.status}
-                  {whatsappStatus.hasQr && <span style={{ padding: '2px 6px', background: '#ef4444', color: 'white', borderRadius: '4px', fontSize: '0.6rem', marginLeft: '4px' }}>QR</span>}
-                </a>
               </p>
             </div>
 
             <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className="glass"
+                style={{
+                  padding: '10px 15px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  color: showFilters ? 'white' : 'var(--text-muted)',
+                  background: showFilters ? 'rgba(99,102,241,0.3)' : 'rgba(255,255,255,0.05)',
+                  border: showFilters ? '1px solid rgba(99,102,241,0.5)' : '1px solid rgba(255,255,255,0.08)',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  letterSpacing: '0.5px'
+                }}
+              >
+                <Search size={14} />
+                FILTROS
+                {(scraperFilters.regions.length < 3 || scraperFilters.types.length < 2) && (
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent)', display: 'inline-block' }} />
+                )}
+              </button>
+
               <button
                 onClick={() => setShowCalendar(!showCalendar)}
                 className="glass"
@@ -450,6 +514,75 @@ function App() {
             </div>
           </header>
 
+          {/* Painel de Filtros do Scraper */}
+          <AnimatePresence>
+            {showFilters && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="glass"
+                style={{ marginBottom: '25px', padding: '20px', overflow: 'hidden', border: '1px solid rgba(99,102,241,0.2)' }}
+              >
+                <h4 style={{ marginBottom: '16px', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '1px', textTransform: 'uppercase', color: 'var(--primary)' }}>
+                  ⚙️ Configuração da Busca
+                </h4>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                  {/* Regiões */}
+                  <div>
+                    <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>📍 Regiões</p>
+                    {[{ id: 'alphaville', label: 'Alphaville', color: '#6366f1' }, { id: 'tambore', label: 'Tamboré', color: '#f59e0b' }, { id: 'barueri', label: 'Barueri', color: '#10b981' }].map(r => (
+                      <label key={r.id} onClick={() => toggleRegion(r.id)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', marginBottom: '6px', borderRadius: '8px', cursor: 'pointer', background: scraperFilters.regions.includes(r.id) ? `${r.color}22` : 'rgba(255,255,255,0.03)', border: `1px solid ${scraperFilters.regions.includes(r.id) ? r.color + '55' : 'rgba(255,255,255,0.08)'}`, transition: 'all 0.2s' }}>
+                        <span style={{ width: '18px', height: '18px', borderRadius: '5px', background: scraperFilters.regions.includes(r.id) ? r.color : 'transparent', border: `2px solid ${scraperFilters.regions.includes(r.id) ? r.color : 'rgba(255,255,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', transition: 'all 0.2s' }}>
+                          {scraperFilters.regions.includes(r.id) ? '✓' : ''}
+                        </span>
+                        <span style={{ fontWeight: 600, fontSize: '0.9rem', color: scraperFilters.regions.includes(r.id) ? 'white' : 'var(--text-muted)' }}>{r.label}</span>
+                      </label>
+                    ))}
+                  </div>
+
+                  {/* Tipo + Preço */}
+                  <div>
+                    <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🏠 Tipo de Negócio</p>
+                    {[{ id: 'venda', label: 'Venda', color: '#6366f1' }, { id: 'aluguel', label: 'Aluguel', color: '#f43f5e' }].map(t => (
+                      <label key={t.id} onClick={() => toggleType(t.id)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', marginBottom: '6px', borderRadius: '8px', cursor: 'pointer', background: scraperFilters.types.includes(t.id) ? `${t.color}22` : 'rgba(255,255,255,0.03)', border: `1px solid ${scraperFilters.types.includes(t.id) ? t.color + '55' : 'rgba(255,255,255,0.08)'}`, transition: 'all 0.2s' }}>
+                        <span style={{ width: '18px', height: '18px', borderRadius: '5px', background: scraperFilters.types.includes(t.id) ? t.color : 'transparent', border: `2px solid ${scraperFilters.types.includes(t.id) ? t.color : 'rgba(255,255,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', transition: 'all 0.2s' }}>
+                          {scraperFilters.types.includes(t.id) ? '✓' : ''}
+                        </span>
+                        <span style={{ fontWeight: 600, fontSize: '0.9rem', color: scraperFilters.types.includes(t.id) ? 'white' : 'var(--text-muted)' }}>{t.label}</span>
+                      </label>
+                    ))}
+
+                    <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', margin: '14px 0 8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>💰 Faixa de Preço (Venda)</p>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <select
+                        value={scraperFilters.priceMin}
+                        onChange={e => saveScraperFilters({ ...scraperFilters, priceMin: parseInt(e.target.value) })}
+                        style={{ flex: 1, background: 'var(--bg-dark)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', padding: '6px', fontSize: '0.8rem' }}
+                      >
+                        {[1000000, 2000000, 3000000, 5000000, 10000000].map(v => <option key={v} value={v}>R$ {(v / 1000000).toFixed(0)}M</option>)}
+                      </select>
+                      <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>até</span>
+                      <select
+                        value={scraperFilters.priceMax}
+                        onChange={e => saveScraperFilters({ ...scraperFilters, priceMax: parseInt(e.target.value) })}
+                        style={{ flex: 1, background: 'var(--bg-dark)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', padding: '6px', fontSize: '0.8rem' }}
+                      >
+                        {[5000000, 10000000, 20000000, 30000000, 50000000].map(v => <option key={v} value={v}>R$ {(v / 1000000).toFixed(0)}M</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Resumo visual */}
+                <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(99,102,241,0.08)', borderRadius: '10px', border: '1px solid rgba(99,102,241,0.15)', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  🔍 Buscando: <b style={{ color: 'white' }}>{scraperFilters.regions.join(', ')}</b> · Tipo: <b style={{ color: 'white' }}>{scraperFilters.types.join(', ')}</b>{scraperFilters.types.includes('venda') && <> · Preço: <b style={{ color: 'white' }}>R${(scraperFilters.priceMin / 1000000).toFixed(0)}M – R${(scraperFilters.priceMax / 1000000).toFixed(0)}M</b></>} · Apenas particulares
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* Calendário de Agendamento */}
           <AnimatePresence>
             {showCalendar && (
@@ -509,14 +642,24 @@ function App() {
 
           {/* Monitor em Tempo Real */}
           <AnimatePresence>
-            {isScraping && (
+            {showMonitor && (
               <motion.div
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: 'auto', opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
                 className="glass"
-                style={{ marginBottom: '25px', padding: '20px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--primary)' }}
+                style={{ marginBottom: '25px', padding: '20px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--primary)', position: 'relative' }}
               >
+                {/* Botão para fechar o monitor manualmente */}
+                {!isScraping && (
+                  <button
+                    onClick={() => setShowMonitor(false)}
+                    style={{ position: 'absolute', top: '10px', right: '10px', background: 'transparent', color: 'var(--text-muted)', border: 'none', cursor: 'pointer' }}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
+
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                   <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '1px' }}>
                     Monitor de Extração Live
@@ -820,6 +963,28 @@ function ListingCard({ listing, onUpdate }) {
             {phone}
           </a>
 
+          {/* Tags região e tipo */}
+          {listing.get('region') && (
+            <span style={{
+              fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.5px', padding: '3px 8px', borderRadius: '6px',
+              background: listing.get('region') === 'alphaville' ? 'rgba(99,102,241,0.25)' : listing.get('region') === 'tambore' ? 'rgba(245,158,11,0.25)' : 'rgba(16,185,129,0.25)',
+              color: listing.get('region') === 'alphaville' ? '#818cf8' : listing.get('region') === 'tambore' ? '#fbbf24' : '#34d399',
+              textTransform: 'uppercase'
+            }}>
+              {listing.get('region') === 'alphaville' ? 'Alphaville' : listing.get('region') === 'tambore' ? 'Tamboré' : 'Barueri'}
+            </span>
+          )}
+          {listing.get('listingType') && (
+            <span style={{
+              fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.5px', padding: '3px 8px', borderRadius: '6px',
+              background: listing.get('listingType') === 'venda' ? 'rgba(99,102,241,0.2)' : 'rgba(244,63,94,0.2)',
+              color: listing.get('listingType') === 'venda' ? '#a5b4fc' : '#fb7185',
+              textTransform: 'uppercase'
+            }}>
+              {listing.get('listingType') === 'venda' ? 'VENDA' : 'ALUGUEL'}
+            </span>
+          )}
+
           {/* Badges de Detalhes */}
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem' }}>
             {listing.get("rooms") && (
@@ -845,7 +1010,7 @@ function ListingCard({ listing, onUpdate }) {
           </div>
         </div>
 
-        {/* Localização e Data */}
+        {/* Localização, Contato e Data */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.7rem' }}>
           {listing.get("location") && (
             <span style={{ color: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', gap: '4px' }}>

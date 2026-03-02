@@ -4,7 +4,9 @@
   "description": "OLX Scraper with Back4App integration and React UI",
   "main": "scraper.js",
   "scripts": {
-    "start": "node scraper.js",
+    "start": "node scraper.js & node whatsapp_service.js",
+    "scraper": "node scraper.js",
+    "whatsapp": "node whatsapp_service.js",
     "build:ui": "cd frontend && npm run build",
     "dev:ui": "cd frontend && npm run dev",
     "test": "echo \"Error: no test specified\" && exit 1"

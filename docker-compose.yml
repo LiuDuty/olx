@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  scraper:
+    build: .
+    command: npm run scraper
+    ports:
+      - "7860:7860"
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    restart: always
+
+  whatsapp:
+    build: .
+    command: npm run whatsapp
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    restart: always

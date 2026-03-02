@@ -201,14 +201,9 @@ app.get('/api/listings', async (req, res) => {
     try {
         const Listing = Parse.Object.extend("Listing");
         const query = new Parse.Query(Listing);
-        if (filter === 'favorites') {
-            query.equalTo("isFavorite", true);
-        } else if (filter === 'ignored') {
-            query.equalTo("status", "ignored");
-        } else {
-            // "Todos" -> tudo que não for ignorado (incluindo favoritos)
-            query.notEqualTo("status", "ignored");
-        }
+        if (filter === 'favorites') query.equalTo("isFavorite", true);
+        else if (filter === 'ignored') query.equalTo("status", "ignored");
+        else query.equalTo("status", "active");
         query.descending("capturedAt");
         const results = await query.find(getOptions());
         res.json(results.map(r => r.toJSON()));
@@ -249,10 +244,7 @@ app.post('/api/clear-database', async (req, res) => {
 app.post('/api/run-now', async (req, res) => {
     console.log("🖱️ Comando disparar scraper recebido!");
     if (isScraping) return res.status(400).json({ error: 'Scraper já está rodando' });
-
     let limit = req.body.limit;
-    let filters = req.body.filters; // Recebido do frontend
-
     if (limit === undefined) {
         try {
             const Config = Parse.Object.extend("Config");
@@ -271,45 +263,9 @@ app.post('/api/run-now', async (req, res) => {
             limit = 50;
         }
     }
-
-    // Se não veio filtros no body, tenta carregar do DB
-    if (!filters) {
-        try {
-            const data = JSON.parse(fs.readFileSync(path.join(__dirname, 'db.json'), 'utf8'));
-            filters = data.scraperFilters;
-        } catch (e) {
-            filters = null;
-        }
-    }
-
-    console.log(`🚀 Iniciando execução manual com limite: ${limit} e filtros: ${JSON.stringify(filters)}`);
-    ejetaScraper(limit, filters);
+    console.log(`🚀 Iniciando execução manual com limite: ${limit}`);
+    ejetaScraper(limit);
     res.json({ message: `Scraper iniciado com limite de ${limit} itens` });
-});
-
-app.get('/api/scraper-filters', (req, res) => {
-    try {
-        const data = JSON.parse(fs.readFileSync(path.join(__dirname, 'db.json'), 'utf8'));
-        res.json(data.scraperFilters || {
-            regions: ['tambore'],
-            types: ['venda'],
-            priceMin: 5000000,
-            priceMax: 50000000
-        });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
-app.post('/api/scraper-filters', (req, res) => {
-    try {
-        const data = JSON.parse(fs.readFileSync(path.join(__dirname, 'db.json'), 'utf8'));
-        data.scraperFilters = req.body;
-        fs.writeFileSync(path.join(__dirname, 'db.json'), JSON.stringify(data, null, 2));
-        res.json({ success: true });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
 });
 
 app.post('/api/whatsapp-reset', async (req, res) => {
@@ -368,15 +324,7 @@ setInterval(async () => {
                     await scheduleConfig.save(null, getOptions());
                 }
                 let runLimit = configMap["limit_enabled"] === "true" ? (parseInt(configMap["limit_value"]) || 50) : 999;
-
-                // Carrega filtros para execução agendada
-                let runFilters = null;
-                try {
-                    const data = JSON.parse(fs.readFileSync(path.join(__dirname, 'db.json'), 'utf8'));
-                    runFilters = data.scraperFilters;
-                } catch (e) { }
-
-                ejetaScraper(runLimit, runFilters);
+                ejetaScraper(runLimit);
             }
         } else {
             let defaultRun = now.set({ hour: 7, minute: 0, second: 0, millisecond: 0 });
@@ -413,14 +361,14 @@ async function updateScraperStatus(message, progress = 0, currentItem = null, li
     }
 }
 
-async function ejetaScraper(limit = 50, filters = null) {
+async function ejetaScraper(limit = 50) {
     if (isScraping) return;
     isScraping = true;
     const foundLinks = [];
     const newResults = [];
     await updateScraperStatus("Iniciando extração...", 5, null, foundLinks);
     try {
-        const results = await scrape(limit, foundLinks, newResults, filters);
+        const results = await scrape(limit, foundLinks, newResults);
         console.log(`📊 Extração finalizada. Total: ${results ? results.length : 0}. Novos: ${newResults.length}`);
         if (newResults.length > 0) {
             await updateScraperStatus(`Finalizado! ${newResults.length} novos registros.`, 100, null, foundLinks);
@@ -497,31 +445,8 @@ async function saveSingleListing(item) {
     }
 }
 
-function generateOlxUrl(region, type, priceMin, priceMax) {
-    // Mapeamento de regiões para slugs da OLX (dentro de estado-sp/sao-paulo-e-regiao/)
-    const regionMap = {
-        'alphaville': 'alphaville',
-        'tambore': 'tambore',
-        'barueri': 'barueri'
-    };
 
-    const regionPath = regionMap[region] || region;
-    const baseUrl = `https://www.olx.com.br/imoveis/${type}/estado-sp/sao-paulo-e-regiao/${regionPath}`;
-
-    // sf=1 e f=p garantem que sejam apenas Particulares (Direto com o proprietário)
-    const url = new URL(baseUrl);
-    url.searchParams.set('ps', priceMin || '');
-    url.searchParams.set('pe', priceMax || '');
-    url.searchParams.set('f', 'p');
-    url.searchParams.set('sf', '1');
-    url.searchParams.set('sp', '6'); // São Paulo e Região
-    url.searchParams.set('ret', '1040'); // Geralmente Casas/Aptos
-
-    return url.toString();
-}
-
-
-async function scrape(limit = 50, foundLinks = [], newResults = [], filters = null) {
+async function scrape(limit = 50, foundLinks = [], newResults = []) {
     console.log(`🚀 OLX: Iniciando extração (Limite: ${limit})...`);
 
     const Listing = Parse.Object.extend("Listing");
@@ -539,184 +464,167 @@ async function scrape(limit = 50, foundLinks = [], newResults = [], filters = nu
     const page = await context.newPage();
     await page.route('**/*.{png,jpg,jpeg,gif,svg,css,woff,woff2}', route => route.abort());
 
-    // URLs a serem processadas
-    const initialUrls = [];
-    if (filters && filters.regions && filters.types) {
-        filters.regions.forEach(r => {
-            filters.types.forEach(t => {
-                initialUrls.push(generateOlxUrl(r, t, filters.priceMin, filters.priceMax));
-            });
-        });
-    } else {
-        // Fallback para Tamboré se nada for fornecido
-        initialUrls.push('https://www.olx.com.br/imoveis/venda/estado-sp/sao-paulo-e-regiao/tambore?ps=5000000&pe=50000000&sp=6&f=p&sf=1&ret=1040');
-    }
-
+    const initialUrl = 'https://www.olx.com.br/imoveis/venda/estado-sp/sao-paulo-e-regiao/tambore?ps=5000000&pe=50000000&sp=6&f=p&ret=1040';
     const allData = [];
-    let totalCount = 0;
 
     try {
-        for (const initialUrl of initialUrls) {
-            if (allData.length >= limit) break;
+        console.log(`📡 OLX: Navegando para lista inicial...`);
+        await page.goto(initialUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-            console.log(`📡 OLX: Navegando para lista: ${initialUrl}`);
-            await page.goto(initialUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        const title = await page.title();
+        console.log(`📄 Título: ${title}`);
 
-            const title = await page.title();
-            console.log(`📄 Título da página: ${title}`);
+        if (title.includes("Access Denied") || title.includes("Cloudflare")) {
+            console.error("🚫 Bloqueado pelo Cloudflare.");
+            await updateScraperStatus("Erro: Bloqueio detectado (Cloudflare)", 0);
+            return [];
+        }
 
-            if (title.includes("Access Denied") || title.includes("Cloudflare")) {
-                console.error("🚫 Bloqueado pelo Cloudflare.");
-                await updateScraperStatus("Erro: Bloqueio detectado (Cloudflare)", 0);
-                continue;
+        const adUrlsResults = await page.evaluate(() => {
+            // Seletor específico da nova estrutura da OLX
+            const cardLinks = Array.from(document.querySelectorAll('a.olx-adcard__link'));
+            if (cardLinks.length > 0) {
+                return cardLinks.map(a => a.href.split('?')[0]);
             }
+            // Fallback para links genéricos de imóveis
+            const links = Array.from(document.querySelectorAll('a'));
+            const filtered = links
+                .map(a => a.href)
+                .filter(h => {
+                    if (!h) return false;
+                    const url = h.split('?')[0];
+                    return url.includes('olx.com.br/') &&
+                        url.includes('/imoveis/') &&
+                        /\d{8,}/.test(url) &&
+                        !url.includes('/venda/') &&
+                        !url.includes('/aluguel/');
+                })
+                .map(h => h.split('?')[0]);
+            return Array.from(new Set(filtered));
+        });
 
-            const adUrlsResults = await page.evaluate(() => {
-                const cardLinks = Array.from(document.querySelectorAll('a.olx-adcard__link'));
-                if (cardLinks.length > 0) {
-                    return cardLinks.map(a => a.href.split('?')[0]);
-                }
-                const links = Array.from(document.querySelectorAll('a'));
-                const filtered = links
-                    .map(a => a.href)
-                    .filter(h => {
-                        if (!h) return false;
-                        const url = h.split('?')[0];
-                        return url.includes('olx.com.br/') &&
-                            url.includes('/imoveis/') &&
-                            /\d{8,}/.test(url) &&
-                            !url.includes('/venda/') &&
-                            !url.includes('/aluguel/');
-                    })
-                    .map(h => h.split('?')[0]);
-                return Array.from(new Set(filtered));
-            });
+        console.log(`🔍 Links Filtrados: ${adUrlsResults.length}`);
+        const targetUrls = adUrlsResults.filter(link => !ignoredLinks.has(link)).slice(0, limit);
+        console.log(`🎯 Processando ${targetUrls.length} links.`);
 
-            console.log(`🔍 Links no total encontrados nesta região: ${adUrlsResults.length}`);
-            const remainingLimit = limit - allData.length;
-            const targetUrls = adUrlsResults
-                .filter(link => !ignoredLinks.has(link))
-                .slice(0, remainingLimit);
+        let count = 0;
+        for (const adUrl of targetUrls) {
+            count++;
+            const progress = Math.round((count / targetUrls.length) * 80) + 10;
+            let retryCount = 0;
+            const maxRetries = 1; // Reduzi retries para ser mais rápido
+            let success = false;
 
-            console.log(`🎯 Processando mais ${targetUrls.length} links deste lote.`);
+            while (retryCount <= maxRetries && !success) {
+                try {
+                    await updateScraperStatus(`Extraindo ${count}/${targetUrls.length}`, progress, adUrl, foundLinks);
+                    await page.goto(adUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
+                    await page.waitForTimeout(1500);
 
-            for (const adUrl of targetUrls) {
-                totalCount++;
-                const progress = Math.min(Math.round((totalCount / limit) * 85) + 5, 95);
-                let retryCount = 0;
-                const maxRetries = 1; // Reduzi retries para ser mais rápido
-                let success = false;
+                    const data = await page.evaluate(() => {
+                        // ══════════════════════════════════════════
+                        // TELEFONE: lê do og:description (fonte real)
+                        // ══════════════════════════════════════════
+                        const ogDesc = document.querySelector('meta[property="og:description"]')?.content || '';
+                        // Exige DDD obrigatório — mínimo 10 dígitos (DDD + telefone)
+                        // Formatos aceitos: (11) 99999-9999 | (11) 9999-9999 | 11 99999-9999 | 1199999-9999
+                        const phoneRegex = /\(?\d{2}\)?\s*(?:9\s?\d{4}|[2-9]\d{3})[-\s]?\d{4}/g;
+                        const isValidPhone = (s) => s.replace(/\D/g, '').length >= 10;
 
-                while (retryCount <= maxRetries && !success) {
-                    try {
-                        await updateScraperStatus(`Extraindo ${totalCount}/${limit}`, progress, adUrl, foundLinks);
-                        await page.goto(adUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
-                        await page.waitForTimeout(1500);
+                        const ogPhones = (ogDesc.match(phoneRegex) || []).filter(isValidPhone);
+                        // Também tenta no body como fallback
+                        const bodyText = document.body.innerText;
+                        const bodyPhones = (bodyText.match(phoneRegex) || []).filter(isValidPhone);
+                        // Prioriza og:description, depois body
+                        const allPhones = [...ogPhones, ...bodyPhones];
+                        // Escolhe o mais longo (mais completo) e remove espaços extras
+                        const bestPhone = allPhones.length > 0
+                            ? allPhones.sort((a, b) => b.replace(/\D/g, '').length - a.replace(/\D/g, '').length)[0].trim()
+                            : "Não informado";
 
-                        const data = await page.evaluate(() => {
-                            // ══════════════════════════════════════════
-                            // TELEFONE: lê do og:description (fonte real)
-                            // ══════════════════════════════════════════
-                            const ogDesc = document.querySelector('meta[property="og:description"]')?.content || '';
-                            // Exige DDD obrigatório — mínimo 10 dígitos (DDD + telefone)
-                            // Formatos aceitos: (11) 99999-9999 | (11) 9999-9999 | 11 99999-9999 | 1199999-9999
-                            const phoneRegex = /\(?\d{2}\)?\s*(?:9\s?\d{4}|[2-9]\d{3})[-\s]?\d{4}/g;
-                            const isValidPhone = (s) => s.replace(/\D/g, '').length >= 10;
+                        // Extrai nome do contato do og:description (ex: "(11) 99999-9999 (Artur)")
+                        const contactNameFromMeta = ogDesc.match(/\(([^)]{2,30})\)\s*$/)?.[1]?.trim() || null;
 
-                            const ogPhones = (ogDesc.match(phoneRegex) || []).filter(isValidPhone);
-                            // Também tenta no body como fallback
-                            const bodyText = document.body.innerText;
-                            const bodyPhones = (bodyText.match(phoneRegex) || []).filter(isValidPhone);
-                            // Prioriza og:description, depois body
-                            const allPhones = [...ogPhones, ...bodyPhones];
-                            // Escolhe o mais longo (mais completo) e remove espaços extras
-                            const bestPhone = allPhones.length > 0
-                                ? allPhones.sort((a, b) => b.replace(/\D/g, '').length - a.replace(/\D/g, '').length)[0].trim()
-                                : "Não informado";
+                        const priceEl = document.querySelector('span.typo-display-large') ||
+                            document.querySelector('#price-box-container span.typo-title-medium') ||
+                            document.querySelector('h2[data-testid="ad-price"]') ||
+                            document.querySelector('.price-value') ||
+                            document.querySelector('span.price');
 
-                            // Extrai nome do contato do og:description (ex: "(11) 99999-9999 (Artur)")
-                            const contactNameFromMeta = ogDesc.match(/\(([^)]{2,30})\)\s*$/)?.[1]?.trim() || null;
+                        const sellerEl = document.querySelector('span.typo-body-large.ad__sc-ypp2u2-4') ||
+                            document.querySelector('span[data-testid="ad-seller-name"]') ||
+                            document.querySelector('div[data-testid="profile-card"] h2');
 
-                            const priceEl = document.querySelector('span.typo-display-large') ||
-                                document.querySelector('#price-box-container span.typo-title-medium') ||
-                                document.querySelector('h2[data-testid="ad-price"]') ||
-                                document.querySelector('.price-value') ||
-                                document.querySelector('span.price');
+                        const titleEl = document.querySelector('h1.typo-title-medium') ||
+                            document.querySelector('h1[data-testid="ad-title"]') ||
+                            document.querySelector('h1') ||
+                            document.querySelector('.ad__sc-1q24z96-0');
 
-                            const sellerEl = document.querySelector('span.typo-body-large.ad__sc-ypp2u2-4') ||
-                                document.querySelector('span[data-testid="ad-seller-name"]') ||
-                                document.querySelector('div[data-testid="profile-card"] h2');
-
-                            const titleEl = document.querySelector('h1.typo-title-medium') ||
-                                document.querySelector('h1[data-testid="ad-title"]') ||
-                                document.querySelector('h1') ||
-                                document.querySelector('.ad__sc-1q24z96-0');
-
-                            // Extração de Detalhes (Quartos, Área, Vagas, Banheiros)
-                            const getDetail = (text) => {
-                                const details = Array.from(document.querySelectorAll('div[data-testid="ad-properties"] div, #details div'));
-                                const found = details.find(el => el.innerText.includes(text));
-                                if (!found) return null;
-                                const value = found.querySelector('a') || found.querySelector('span:last-child');
-                                return value ? value.innerText.trim() : null;
-                            };
-
-                            const priceBoxText = document.querySelector('#price-box-container')?.innerText || "";
-                            const getPriceBoxDetail = (label) => {
-                                const match = priceBoxText.match(new RegExp(`${label}\\s*R\\$\\s*([\\d.]+)`, 'i'));
-                                return match ? `R$ ${match[1]}` : null;
-                            };
-
-                            const locationEl = document.querySelector('div[data-testid="ad-location-details-container"]') ||
-                                document.querySelector('.ad__sc-1m38784-0');
-
-                            return {
-                                title: titleEl ? titleEl.innerText.trim() : "Sem Título",
-                                price: priceEl ? priceEl.innerText.trim() : "N/A",
-                                phone: bestPhone,
-                                contactName: contactNameFromMeta || (sellerEl ? sellerEl.innerText.trim() : "Desconhecido"),
-                                rooms: getDetail("Quartos"),
-                                area: getDetail("Área útil") || getDetail("Área construída"),
-                                garage: getDetail("Vagas na garagem"),
-                                bathrooms: getDetail("Banheiros"),
-                                iptu: getPriceBoxDetail("IPTU"),
-                                condo: getPriceBoxDetail("Condomínio"),
-                                location: locationEl ? locationEl.innerText.replace("Exibir no mapa", "").trim() : "Localização não disponível"
-                            };
-                        });
-
-                        console.log(`💎 Extraído: ${data.price} | Título: ${data.title}`);
-                        const scrapedItem = {
-                            link: adUrl,
-                            valor: data.price,
-                            telefone: data.phone,
-                            contactName: data.contactName,
-                            title: data.title,
-                            rooms: data.rooms,
-                            area: data.area,
-                            garage: data.garage,
-                            bathrooms: data.bathrooms,
-                            iptu: data.iptu,
-                            condo: data.condo,
-                            location: data.location
+                        // Extração de Detalhes (Quartos, Área, Vagas, Banheiros)
+                        const getDetail = (text) => {
+                            const details = Array.from(document.querySelectorAll('div[data-testid="ad-properties"] div, #details div'));
+                            const found = details.find(el => el.innerText.includes(text));
+                            if (!found) return null;
+                            const value = found.querySelector('a') || found.querySelector('span:last-child');
+                            return value ? value.innerText.trim() : null;
                         };
-                        allData.push(scrapedItem);
-                        foundLinks.push(adUrl);
-                        const isNewEntry = await saveSingleListing(scrapedItem);
-                        if (isNewEntry) newResults.push(scrapedItem);
-                        await updateScraperStatus(`Encontrado: ${data.price}`, progress, adUrl, foundLinks);
-                        success = true;
-                    } catch (e) {
-                        retryCount++;
-                        console.error(`⚠️ Erro na tentativa ${retryCount} para ${adUrl}: ${e.message}`);
-                        if (retryCount > maxRetries) {
-                            console.error(`❌ Desistindo de ${adUrl}`);
-                        } else {
-                            await page.waitForTimeout(3000);
-                        }
+
+                        const priceBoxText = document.querySelector('#price-box-container')?.innerText || "";
+                        const getPriceBoxDetail = (label) => {
+                            const match = priceBoxText.match(new RegExp(`${label}\\s*R\\$\\s*([\\d.]+)`, 'i'));
+                            return match ? `R$ ${match[1]}` : null;
+                        };
+
+                        const locationEl = document.querySelector('div[data-testid="ad-location-details-container"]') ||
+                            document.querySelector('.ad__sc-1m38784-0');
+
+                        return {
+                            title: titleEl ? titleEl.innerText.trim() : "Sem Título",
+                            price: priceEl ? priceEl.innerText.trim() : "N/A",
+                            phone: bestPhone,
+                            contactName: contactNameFromMeta || (sellerEl ? sellerEl.innerText.trim() : "Desconhecido"),
+                            rooms: getDetail("Quartos"),
+                            area: getDetail("Área útil") || getDetail("Área construída"),
+                            garage: getDetail("Vagas na garagem"),
+                            bathrooms: getDetail("Banheiros"),
+                            iptu: getPriceBoxDetail("IPTU"),
+                            condo: getPriceBoxDetail("Condomínio"),
+                            location: locationEl ? locationEl.innerText.replace("Exibir no mapa", "").trim() : "Localização não disponível"
+                        };
+                    });
+
+                    console.log(`💎 Extraído: ${data.price} | Título: ${data.title}`);
+                    const scrapedItem = {
+                        link: adUrl,
+                        valor: data.price,
+                        telefone: data.phone,
+                        contactName: data.contactName,
+                        title: data.title,
+                        rooms: data.rooms,
+                        area: data.area,
+                        garage: data.garage,
+                        bathrooms: data.bathrooms,
+                        iptu: data.iptu,
+                        condo: data.condo,
+                        location: data.location
+                    };
+                    allData.push(scrapedItem);
+                    foundLinks.push(adUrl);
+                    const isNewEntry = await saveSingleListing(scrapedItem);
+                    if (isNewEntry) newResults.push(scrapedItem);
+                    await updateScraperStatus(`Encontrado: ${data.price}`, progress, adUrl, foundLinks);
+                    success = true;
+                } catch (e) {
+                    retryCount++;
+                    console.error(`⚠️ Erro na tentativa ${retryCount} para ${adUrl}: ${e.message}`);
+                    if (retryCount > maxRetries) {
+                        console.error(`❌ Desistindo de ${adUrl}`);
+                    } else {
+                        await page.waitForTimeout(3000);
                     }
                 }
             }
+            await page.waitForTimeout(2000);
         }
     } catch (err) {
         console.error("❌ Erro durante o scraping:", err.message);

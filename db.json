@@ -1,0 +1,75 @@
+{
+  "listings": [
+    {
+      "link": "https://sp.olx.com.br/sao-paulo-e-regiao/imoveis/casa-terrea-condominio-valencia-1431814600",
+      "price": "R$ 1.400.000",
+      "phone": "(11) 984774828",
+      "waLink": "https://wa.me/5511984774828?text=Ol%C3%A1!%20Vi%20seu%20an%C3%BAncio%20e%20quero%20saber%20mais",
+      "contactName": "Desconhecido",
+      "title": "Casa Térrea condomínio Valencia",
+      "rooms": "3",
+      "area": "3",
+      "garage": "3",
+      "bathrooms": "3",
+      "iptu": "R$ 650",
+      "condo": "R$ 350",
+      "location": "Localização não disponível",
+      "lastUpdated": "2026-03-02T18:18:20.718Z",
+      "status": "active",
+      "isFavorite": false,
+      "notes": "",
+      "capturedAt": "2026-03-02T18:18:20.718Z"
+    },
+    {
+      "link": "https://sp.olx.com.br/sao-paulo-e-regiao/imoveis/linda-casa-no-residencial-6-santana-de-parnaiba-sp-1479133154",
+      "price": "R$ 2.850.000",
+      "phone": "1479133154",
+      "waLink": "https://wa.me/551479133154?text=Ol%C3%A1!%20Vi%20seu%20an%C3%BAncio%20e%20quero%20saber%20mais",
+      "contactName": "Roberto",
+      "title": "Linda Casa no Residencial 6- Santana de Parnaiba SP",
+      "rooms": "4",
+      "area": "4",
+      "garage": "4",
+      "bathrooms": "4",
+      "iptu": "R$ 5.000",
+      "condo": "R$ 2.200",
+      "location": "Localização não disponível",
+      "lastUpdated": "2026-03-02T18:07:55.583Z",
+      "status": "active",
+      "isFavorite": false,
+      "notes": "",
+      "capturedAt": "2026-03-02T18:07:55.583Z",
+      "objectId": "v2uqtg0xb",
+      "id": "v2uqtg0xb"
+    }
+  ],
+  "config": {
+    "next_run": "2026-03-03T07:00:00.000-03:00",
+    "limit_enabled": "true",
+    "limit_value": "2"
+  },
+  "status": {
+    "message": "Aguardando próximo ciclo...",
+    "progress": 0,
+    "currentItem": null,
+    "links": [],
+    "lastUpdate": "2026-03-02T18:18:54.028Z"
+  },
+  "whatsapp": {
+    "status": "Aguardando Scan",
+    "hasQr": true,
+    "lastQr": "2@z1+Ojmdx/t1a+295xJYAXM7eaxIDOw7x3FAaC6H9qRfHSsg/2yehPLGCugkPjTefBdwj4V0Mj+l6wZcvt/s9U+EE8MAsivL9bs8=,r6wHxjPl3IlOOqYiVbF3x7YbKyvFVOagf0CHmmNFRz8=,EtZZ72Js2KxGo0fqkM5ZHL31irvJZpkYPZk2m31uSQ8=,CgtEw0PflQHENA/uMHqoEgZCqXmH+fAS3nSiCz4MnaY=,1",
+    "updatedAt": "2026-03-01T10:43:29.729Z"
+  },
+  "scraperFilters": {
+    "regions": [
+      "alphaville",
+      "tambore"
+    ],
+    "types": [
+      "venda"
+    ],
+    "priceMin": 1000000,
+    "priceMax": 50000000
+  }
+}
