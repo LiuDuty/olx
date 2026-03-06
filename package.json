@@ -1,7 +1,7 @@
 {
   "name": "radarolx",
   "version": "1.0.0",
-  "description": "RadarWeb OLX Frontend (Firebase Hosting)",
+  "description": "OpenHouses OLX Frontend (Firebase Hosting)",
   "scripts": {
     "build:ui": "cd frontend && npm run build",
     "deploy": "firebase deploy"

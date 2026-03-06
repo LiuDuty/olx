@@ -359,7 +359,7 @@ function App() {
           <header className="header" style={{ marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
             <div>
               <h1 style={{ fontSize: '2rem', fontWeight: 800, background: 'linear-gradient(to right, #6366f1, #f43f5e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                RadarWeb OLX
+                OpenHouses OLX
               </h1>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '5px' }}>
                 <span style={{
@@ -813,7 +813,7 @@ function SplashScreen({ version }) {
         }}>
           <RefreshCw size={40} color="white" className="spin" />
         </div>
-        <h1 style={{ fontSize: '2.5rem', fontWeight: 900, marginBottom: '5px' }}>RadarWeb</h1>
+        <h1 style={{ fontSize: '2.5rem', fontWeight: 900, marginBottom: '5px' }}>OpenHouses</h1>
         <p style={{ color: 'var(--primary)', fontWeight: 700, letterSpacing: '2px' }}>V {version}</p>
         <div style={{ marginTop: '20px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Carregando seus dados...</div>
       </motion.div>
@@ -826,7 +826,7 @@ function TutorialStep({ step, onNext, onSkip }) {
 
   const steps = [
     {
-      title: "🚀 Bem-vindo ao RadarWeb!",
+      title: "🚀 Bem-vindo ao OpenHouses!",
       content: "Este robô monitora a OLX de Alphaville e arredores para encontrar as melhores oportunidades de imóveis direto com proprietários.",
       icon: <RefreshCw size={32} color="white" />
     },
@@ -990,7 +990,7 @@ function ListingCard({ listing, onUpdate }) {
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem' }}>
             {listing.get("rooms") && (
               <span title="Quartos" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <Home size={14} /> {listing.get("rooms").replace(/\D/g, '')}
+                <Home size={14} /> {String(listing.get("rooms")).replace(/\D/g, '')}
               </span>
             )}
             {listing.get("area") && (
@@ -1000,7 +1000,7 @@ function ListingCard({ listing, onUpdate }) {
             )}
             {listing.get("garage") && (
               <span title="Vagas" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <Layout size={14} /> {listing.get("garage").replace(/\D/g, '')}
+                <Layout size={14} /> {String(listing.get("garage")).replace(/\D/g, '')}
               </span>
             )}
             {listing.get("condo") && (
@@ -1015,7 +1015,7 @@ function ListingCard({ listing, onUpdate }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.7rem' }}>
           {listing.get("location") && (
             <span style={{ color: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <MapPin size={12} /> {listing.get("location").split(',').slice(0, 2).join(',')}
+              <MapPin size={12} /> {String(listing.get("location")).split(',').slice(0, 2).join(',')}
             </span>
           )}
 
