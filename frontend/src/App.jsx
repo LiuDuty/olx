@@ -67,7 +67,9 @@ function App() {
     regions: ['alphaville', 'tambore', 'barueri'],
     types: ['venda'],
     priceMin: 1000000,
-    priceMax: 50000000
+    priceMax: 50000000,
+    priceMinAluguel: 1000,
+    priceMaxAluguel: 50000
   });
 
   useEffect(() => {
@@ -547,31 +549,60 @@ function App() {
                         <span style={{ fontWeight: 600, fontSize: '0.9rem', color: scraperFilters.types.includes(t.id) ? 'white' : 'var(--text-muted)' }}>{t.label}</span>
                       </label>
                     ))}
+                    {scraperFilters.types.includes('venda') && (
+                      <div style={{ marginTop: '14px' }}>
+                        <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>💰 Faixa de Preço (Venda)</p>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <select
+                            value={scraperFilters.priceMin}
+                            onChange={e => saveScraperFilters({ ...scraperFilters, priceMin: parseInt(e.target.value) })}
+                            style={{ flex: 1, background: 'var(--bg-dark)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', padding: '6px', fontSize: '0.8rem' }}
+                          >
+                            {[500000, 1000000, 2000000, 3000000, 5000000, 10000000].map(v => <option key={v} value={v}>R$ {(v / 1000000).toFixed(1)}M</option>)}
+                          </select>
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>até</span>
+                          <select
+                            value={scraperFilters.priceMax}
+                            onChange={e => saveScraperFilters({ ...scraperFilters, priceMax: parseInt(e.target.value) })}
+                            style={{ flex: 1, background: 'var(--bg-dark)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', padding: '6px', fontSize: '0.8rem' }}
+                          >
+                            {[1000000, 5000000, 10000000, 20000000, 30000000, 50000000, 100000000].map(v => <option key={v} value={v}>R$ {(v / 1000000).toFixed(0)}M</option>)}
+                          </select>
+                        </div>
+                      </div>
+                    )}
 
-                    <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', margin: '14px 0 8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>💰 Faixa de Preço (Venda)</p>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <select
-                        value={scraperFilters.priceMin}
-                        onChange={e => saveScraperFilters({ ...scraperFilters, priceMin: parseInt(e.target.value) })}
-                        style={{ flex: 1, background: 'var(--bg-dark)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', padding: '6px', fontSize: '0.8rem' }}
-                      >
-                        {[1000000, 2000000, 3000000, 5000000, 10000000].map(v => <option key={v} value={v}>R$ {(v / 1000000).toFixed(0)}M</option>)}
-                      </select>
-                      <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>até</span>
-                      <select
-                        value={scraperFilters.priceMax}
-                        onChange={e => saveScraperFilters({ ...scraperFilters, priceMax: parseInt(e.target.value) })}
-                        style={{ flex: 1, background: 'var(--bg-dark)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', padding: '6px', fontSize: '0.8rem' }}
-                      >
-                        {[5000000, 10000000, 20000000, 30000000, 50000000].map(v => <option key={v} value={v}>R$ {(v / 1000000).toFixed(0)}M</option>)}
-                      </select>
-                    </div>
+                    {scraperFilters.types.includes('aluguel') && (
+                      <div style={{ marginTop: '14px' }}>
+                        <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🔑 Faixa de Preço (Aluguel)</p>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <select
+                            value={scraperFilters.priceMinAluguel || 1000}
+                            onChange={e => saveScraperFilters({ ...scraperFilters, priceMinAluguel: parseInt(e.target.value) })}
+                            style={{ flex: 1, background: 'var(--bg-dark)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', padding: '6px', fontSize: '0.8rem' }}
+                          >
+                            {[500, 1000, 2000, 3000, 5000, 10000].map(v => <option key={v} value={v}>R$ {(v / 1000).toFixed(1)}k</option>)}
+                          </select>
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>até</span>
+                          <select
+                            value={scraperFilters.priceMaxAluguel || 50000}
+                            onChange={e => saveScraperFilters({ ...scraperFilters, priceMaxAluguel: parseInt(e.target.value) })}
+                            style={{ flex: 1, background: 'var(--bg-dark)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', padding: '6px', fontSize: '0.8rem' }}
+                          >
+                            {[5000, 10000, 20000, 30000, 50000, 100000].map(v => <option key={v} value={v}>R$ {(v / 1000).toFixed(0)}k</option>)}
+                          </select>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 {/* Resumo visual */}
                 <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(99,102,241,0.08)', borderRadius: '10px', border: '1px solid rgba(99,102,241,0.15)', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  🔍 Buscando: <b style={{ color: 'white' }}>{scraperFilters.regions.join(', ')}</b> · Tipo: <b style={{ color: 'white' }}>{scraperFilters.types.join(', ')}</b>{scraperFilters.types.includes('venda') && <> · Preço: <b style={{ color: 'white' }}>R${(scraperFilters.priceMin / 1000000).toFixed(0)}M – R${(scraperFilters.priceMax / 1000000).toFixed(0)}M</b></>} · Apenas particulares
+                  🔍 Buscando: <b style={{ color: 'white' }}>{scraperFilters.regions.join(', ')}</b> · Tipo: <b style={{ color: 'white' }}>{scraperFilters.types.join(', ')}</b>
+                  {scraperFilters.types.includes('venda') && <> · Venda: <b style={{ color: 'white' }}>R${(scraperFilters.priceMin / 1000000).toFixed(1)}M+</b></>}
+                  {scraperFilters.types.includes('aluguel') && <> · Aluguel: <b style={{ color: 'white' }}>R${(scraperFilters.priceMinAluguel / 1000).toFixed(1)}k+</b></>}
+                  · Apenas particulares
                 </div>
               </motion.div>
             )}
