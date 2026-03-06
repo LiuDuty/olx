@@ -1,42 +1,14 @@
 {
-  "name": "olx",
+  "name": "radarolx",
   "version": "1.0.0",
-  "description": "OLX Scraper with Back4App integration and React UI",
-  "main": "scraper.js",
+  "description": "RadarWeb OLX Frontend (Firebase Hosting)",
   "scripts": {
-    "start": "node scraper.js & node whatsapp_service.js",
-    "scraper": "node scraper.js",
-    "whatsapp": "node whatsapp_service.js",
     "build:ui": "cd frontend && npm run build",
-    "dev:ui": "cd frontend && npm run dev",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "deploy": "firebase deploy"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/LiuDuty/olx.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/LiuDuty/olx/issues"
-  },
-  "homepage": "https://github.com/LiuDuty/olx#readme",
   "dependencies": {
-    "cors": "^2.8.6",
-    "dotenv": "^16.4.1",
-    "express": "^5.2.1",
-    "firebase-admin": "^13.7.0",
     "firebase-functions": "^7.0.6",
-    "luxon": "^3.4.4",
-    "node-cron": "^4.2.1",
-    "parse": "^5.3.0",
-    "playwright": "^1.58.2",
-    "playwright-extra": "^4.3.6",
-    "puppeteer-extra-plugin-stealth": "^2.11.2",
-    "qrcode": "^1.5.4",
-    "qrcode-terminal": "^0.12.0",
-    "whatsapp-web.js": "^1.34.6"
+    "firebase-admin": "^13.7.0"
   },
   "devDependencies": {
     "firebase-functions-test": "^3.4.1"

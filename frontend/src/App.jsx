@@ -14,7 +14,6 @@ import {
   Home,
   Layout,
   Bath,
-  Smartphone,
   User,
   Calendar,
   Copy,
@@ -24,6 +23,23 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import CalendarBox from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
+
+// Import Firebase
+import { db } from './firebase_config';
+import {
+  collection,
+  getDocs,
+  getDoc,
+  setDoc,
+  updateDoc,
+  doc,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  deleteDoc,
+  writeBatch
+} from "firebase/firestore";
 
 const APP_VERSION = "2.1.0"; // Versão atual para controle de release
 
@@ -39,7 +55,6 @@ function App() {
   const [nextRun, setNextRun] = useState('');
   const [search, setSearch] = useState('');
   const [liveStatus, setLiveStatus] = useState({ message: 'Aguardando...', progress: 0, currentItem: null, links: [] });
-  // const [whatsappStatus, setWhatsappStatus] = useState({ status: '...', hasQr: false }); // WhatsApp Desabilitado
   const [showCalendar, setShowCalendar] = useState(false);
   const [limit, setLimit] = useState(3);
   const [limitEnabled, setLimitEnabled] = useState(false);
@@ -84,22 +99,17 @@ function App() {
     }
   }, [filter, showSplash, showTutorial, isScraping]);
 
-  const API_BASE_URL = (window.location.hostname.includes('localhost') || window.location.hostname.includes('127.0.0.1'))
-    ? 'http://localhost:3000'
-    : 'https://olx-12ntim1b.b4a.run';
-
-
-
   const fetchStatus = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/status`);
-      if (!response.ok) throw new Error('Falha ao buscar status do scraper');
-      const data = await response.json();
-      if (data) {
+      const docRef = doc(db, "system", "status");
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        const data = docSnap.data();
         setLiveStatus({
-          message: data.message,
-          progress: data.progress,
-          currentItem: data.currentItem,
+          message: data.message || 'Aguardando...',
+          progress: data.progress || 0,
+          currentItem: data.currentItem || null,
           links: data.links || []
         });
 
@@ -112,11 +122,10 @@ function App() {
           setShowMonitor(true);
         } else if (data.progress === 100) {
           setIsScraping(false);
-          // Se tiver links, garante que o monitor apareça (mesmo após refresh)
           if (data.links?.length > 0) setShowMonitor(true);
         } else if (isError) {
           setIsScraping(false);
-          setShowMonitor(true); // Se teve erro, trava o monitor aberto
+          setShowMonitor(true);
         } else if (data.progress === 0) {
           const isStarting = msg.includes('iniciando') || msg.includes('verificando') || msg.includes('conectando');
           if (isStarting) {
@@ -124,9 +133,7 @@ function App() {
             setShowMonitor(true);
           } else {
             setIsScraping(false);
-            // Se tiver links de uma extração recém-finalizada, mantém aberto
             if (data.links?.length > 0) setShowMonitor(true);
-            // Removida lógica de fechamento automático para evitar que suma da tela
           }
         }
       }
@@ -137,57 +144,63 @@ function App() {
 
   const fetchListings = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/listings?filter=${filter}`);
-      if (!response.ok) throw new Error(`Erro HTTP: ${response.status}`);
-      const results = await response.json();
+      const listingsRef = collection(db, "listings");
+      // Buscamos os itens sem filtros complexos para evitar erro de índice no Firestore
+      const querySnapshot = await getDocs(listingsRef);
 
-      const mappedResults = Array.isArray(results) ? results.map(item => ({
-        id: item.objectId || item.id,
-        get: (field) => item[field],
-        set: (field, value) => { item[field] = value }
-      })) : [];
+      const results = [];
+      querySnapshot.forEach((doc) => {
+        const item = doc.data();
+        results.push({
+          id: doc.id,
+          get: (field) => item[field],
+          set: (field, value) => { item[field] = value },
+          data: item // guardamos o objeto puro para facilitar filtros
+        });
+      });
 
-      setListings(mappedResults);
+      // Filtramos e Ordenamos no JavaScript (consome mais memória mas evita erro de índice)
+      const filtered = results.filter(item => {
+        if (filter === 'favorites') return item.data.isFavorite === true;
+        if (filter === 'ignored') return item.data.status === 'ignored';
+        return item.data.status !== 'ignored';
+      });
+
+      setListings(filtered);
     } catch (error) {
       console.error("Error fetching listings:", error);
-      // Opcional: mostrar mensagem de erro na UI
     } finally {
       setLoading(false);
     }
   };
 
+  const toDate = (val) => {
+    if (!val) return null;
+    if (typeof val.toDate === 'function') return val.toDate();
+    return new Date(val);
+  };
+
   const fetchConfig = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/config`);
-      const data = await response.json();
-      if (data) {
+      const docRef = doc(db, "system", "filters");
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setScraperFilters(data);
         if (data.next_run) setNextRun(data.next_run);
         if (data.limit_value) setLimit(data.limit_value);
-        if (data.limit_enabled) setLimitEnabled(data.limit_enabled === "true");
+        if (data.limit_enabled !== undefined) setLimitEnabled(data.limit_enabled);
       }
     } catch (error) {
       console.error("Error fetching config:", error);
-    }
-    // Carrega filtros do scraper
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/scraper-filters`);
-      if (res.ok) {
-        const f = await res.json();
-        setScraperFilters(f);
-      }
-    } catch (e) {
-      console.error("Error fetching scraper filters:", e);
     }
   };
 
   const saveScraperFilters = async (newFilters) => {
     setScraperFilters(newFilters);
     try {
-      await fetch(`${API_BASE_URL}/api/scraper-filters`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newFilters)
-      });
+      const docRef = doc(db, "system", "filters");
+      await setDoc(docRef, newFilters, { merge: true });
     } catch (e) {
       console.error("Error saving scraper filters:", e);
     }
@@ -197,7 +210,7 @@ function App() {
     const newRegions = scraperFilters.regions.includes(region)
       ? scraperFilters.regions.filter(r => r !== region)
       : [...scraperFilters.regions, region];
-    if (newRegions.length === 0) return; // pelo menos 1
+    if (newRegions.length === 0) return;
     saveScraperFilters({ ...scraperFilters, regions: newRegions });
   };
 
@@ -205,17 +218,14 @@ function App() {
     const newTypes = scraperFilters.types.includes(type)
       ? scraperFilters.types.filter(t => t !== type)
       : [...scraperFilters.types, type];
-    if (newTypes.length === 0) return; // pelo menos 1
+    if (newTypes.length === 0) return;
     saveScraperFilters({ ...scraperFilters, types: newTypes });
   };
 
   const saveConfig = async (key, value) => {
     try {
-      await fetch(`${API_BASE_URL}/api/set-config`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key, value })
-      });
+      const docRef = doc(db, "system", "filters");
+      await setDoc(docRef, { [key]: value }, { merge: true });
     } catch (error) {
       console.error("Error saving config:", error);
     }
@@ -223,15 +233,9 @@ function App() {
 
   const handleUpdateListing = async (listing, updates) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/update-listing`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: listing.id, updates })
-      });
-
-      if (response.ok) {
-        fetchListings();
-      }
+      const docRef = doc(db, "listings", listing.id);
+      await updateDoc(docRef, updates);
+      fetchListings();
     } catch (error) {
       console.error("Error updating listing:", error);
     }
@@ -239,29 +243,29 @@ function App() {
 
   const runScraper = async () => {
     setIsScraping(true);
-    setShowMonitor(true); // Abre o monitor imediatamente ao clicar
+    setShowMonitor(true);
     try {
-      const runLimit = limitEnabled ? parseInt(limit) : 999;
-      const response = await fetch(`${API_BASE_URL}/api/run-now`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ limit: runLimit, filters: scraperFilters })
+      // Criar um pedido formal de extração
+      const requestRef = doc(collection(db, "requests"));
+      await setDoc(requestRef, {
+        type: 'MANUAL_START',
+        requestedAt: new Date(),
+        status: 'pending',
+        filters: scraperFilters
       });
 
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || 'Erro ao iniciar');
-      }
+      console.log(`Pedido de extração enviado: ${requestRef.id}`);
 
-      const regioes = scraperFilters.regions.join(', ');
-      const tipos = scraperFilters.types.join(', ');
-      // Removido alert para não travar o monitor
-      console.log(`Scraper iniciado: ${regioes} | ${tipos}`);
+      // Atualiza o status visual para feedback imediato
+      const statusRef = doc(db, "system", "status");
+      await setDoc(statusRef, {
+        message: "Pedido enviado... Aguardando robô local.",
+        progress: 0,
+        lastUpdate: new Date()
+      }, { merge: true });
+
     } catch (error) {
       console.error("Erro ao disparar scraper:", error);
-      alert("Erro ao disparar scraper: " + error.message);
-    } finally {
-      // Removido o timeout que resetava o estado erroneamente
     }
   };
 
@@ -273,13 +277,8 @@ function App() {
     }).toISO();
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/set-schedule`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nextRun: nextTime })
-      });
-
-      if (!response.ok) throw new Error('Erro ao salvar');
+      const docRef = doc(db, "system", "filters");
+      await setDoc(docRef, { next_run: nextTime }, { merge: true });
 
       setNextRun(nextTime);
       setShowCalendar(false);
@@ -296,17 +295,23 @@ function App() {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/clear-database`, { method: 'POST' });
-      const data = await response.json();
-      if (response.ok) {
-        alert(`Base limpa com sucesso! ${data.count} registros removidos.`);
-        fetchListings(); // Recarrega a lista (que deve ficar vazia)
-      } else {
-        throw new Error(data.error || 'Erro ao limpar');
-      }
+      setLoading(true);
+      const q = query(collection(db, "listings"));
+      const snapshot = await getDocs(q);
+
+      const batch = writeBatch(db);
+      snapshot.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+
+      await batch.commit();
+      alert(`Base limpa com sucesso! ${snapshot.size} registros removidos.`);
+      fetchListings();
     } catch (err) {
       console.error("❌ Erro ao limpar base de dados:", err.message);
       alert("Erro ao limpar base: " + err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -317,14 +322,11 @@ function App() {
       (l.get("notes") || "").toLowerCase().includes(search.toLowerCase())
     )
     .sort((a, b) => {
-      const getDate = (obj) => {
-        const val = obj.get("capturedAt") || obj.get("lastUpdated");
-        if (!val) return new Date(0);
-        if (typeof val === 'string') return new Date(val);
-        if (val && typeof val === 'object' && val.iso) return new Date(val.iso);
-        return val;
+      const getVal = (obj) => {
+        const d = toDate(obj.get("capturedAt") || obj.get("lastUpdated"));
+        return d ? d.getTime() : 0;
       };
-      return getDate(b) - getDate(a);
+      return getVal(b) - getVal(a);
     });
 
   return (
@@ -830,13 +832,13 @@ function TutorialStep({ step, onNext, onSkip }) {
     },
     {
       title: "📋 Gestão de Anúncios",
-      content: "Você pode favoritar imóveis, adicionar notas pessoais e ignorar o que não interessa. Itens ignorados não aparecem mais nas extrações.",
+      content: "Favoritos, notas pessoais e filtros. Itens ignorados não aparecem mais nas extrações.",
       icon: <Star size={32} color="white" />
     },
     {
-      title: "📱 WhatsApp & Agendamento",
-      content: "Conecte seu WhatsApp para receber o resumo diário. Use o calendário para agendar quando o robô deve rodar automaticamente.",
-      icon: <Smartphone size={32} color="white" />
+      title: "📅 Agendamento",
+      content: "Use o calendário para definir quando o robô deve rodar automaticamente na sua base.",
+      icon: <Calendar size={32} color="white" />
     }
   ];
 
@@ -1021,16 +1023,19 @@ function ListingCard({ listing, onUpdate }) {
             {(() => {
               const capDate = listing.get("capturedAt") || listing.get("lastUpdated");
               if (!capDate) return '-';
-              let isoStr = '';
-              if (typeof capDate === 'string') isoStr = capDate;
-              else if (capDate && typeof capDate === 'object' && capDate.iso) isoStr = capDate.iso;
 
-              if (isoStr) {
-                const dt = DateTime.fromISO(isoStr);
-                return dt.isValid ? dt.toFormat('dd/MM/yyyy HH:mm') : '-';
+              let dt;
+              if (capDate && typeof capDate.toDate === 'function') {
+                dt = DateTime.fromJSDate(capDate.toDate());
+              } else if (typeof capDate === 'string') {
+                dt = DateTime.fromISO(capDate);
+              } else if (capDate && capDate.iso) {
+                dt = DateTime.fromISO(capDate.iso);
+              } else {
+                dt = DateTime.fromJSDate(new Date(capDate));
               }
-              const dtJS = DateTime.fromJSDate(capDate);
-              return dtJS.isValid ? dtJS.toFormat('dd/MM/yyyy HH:mm') : '-';
+
+              return dt.isValid ? dt.toFormat('dd/MM/yyyy HH:mm') : '-';
             })()}
           </span>
 
