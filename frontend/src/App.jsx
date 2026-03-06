@@ -18,7 +18,8 @@ import {
   Calendar,
   Copy,
   Maximize,
-  MapPin
+  MapPin,
+  X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import CalendarBox from 'react-calendar';
@@ -161,9 +162,15 @@ function App() {
 
       // Filtramos e Ordenamos no JavaScript (consome mais memória mas evita erro de índice)
       const filtered = results.filter(item => {
+        const isIgnored = item.data.status === 'ignored';
+        if (filter === 'ignored') return isIgnored;
+        if (isIgnored) return false; // Nas outras abas, nunca mostrar ignorados
+
         if (filter === 'favorites') return item.data.isFavorite === true;
-        if (filter === 'ignored') return item.data.status === 'ignored';
-        return item.data.status !== 'ignored';
+        if (filter === 'vendas') return item.data.listingType === 'venda';
+        if (filter === 'aluguel') return item.data.listingType === 'aluguel';
+
+        return true; // Aba 'active' (Todos)
       });
 
       setListings(filtered);
@@ -654,9 +661,27 @@ function App() {
                 {!isScraping && (
                   <button
                     onClick={() => setShowMonitor(false)}
-                    style={{ position: 'absolute', top: '10px', right: '10px', background: 'transparent', color: 'var(--text-muted)', border: 'none', cursor: 'pointer' }}
+                    style={{
+                      position: 'absolute',
+                      top: '15px',
+                      right: '15px',
+                      background: 'rgba(255,255,255,0.05)',
+                      color: 'white',
+                      border: 'none',
+                      cursor: 'pointer',
+                      width: '30px',
+                      height: '30px',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+                    onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                    title="Fechar Monitor"
                   >
-                    <Trash2 size={16} />
+                    <X size={18} />
                   </button>
                 )}
 
@@ -675,11 +700,23 @@ function App() {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div className="spin" style={{ width: '15px', height: '15px', border: '2px solid var(--primary)', borderTopColor: 'transparent', borderRadius: '50%' }} />
-                  <span style={{ fontSize: '0.95rem', color: 'var(--text-main)' }}>{liveStatus.message}</span>
+                  {isScraping ? (
+                    <div className="spin" style={{ width: '15px', height: '15px', border: '2px solid var(--primary)', borderTopColor: 'transparent', borderRadius: '50%' }} />
+                  ) : (
+                    <span style={{ fontSize: '1.2rem' }}>{liveStatus.progress === 100 ? '✅' : 'ℹ️'}</span>
+                  )}
+                  <span style={{
+                    fontSize: '0.95rem',
+                    color: liveStatus.progress === 100 ? '#10b981' : 'var(--text-main)',
+                    fontWeight: liveStatus.progress === 100 ? 700 : 500
+                  }}>
+                    {liveStatus.progress === 100
+                      ? `FINALIZADO: ${liveStatus.links?.length || 0} imóveis extraídos com sucesso!`
+                      : liveStatus.message}
+                  </span>
                 </div>
 
-                {liveStatus.currentItem && (
+                {liveStatus.currentItem && isScraping && (
                   <div style={{ marginTop: '10px', fontSize: '0.8rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '8px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px', borderLeft: '3px solid var(--primary)' }}>
                     PROCESSANDO: {liveStatus.currentItem}
                   </div>
@@ -739,22 +776,29 @@ function App() {
             </div>
 
             <div className="glass" style={{ display: 'flex', padding: '5px', gap: '5px', flexWrap: 'wrap' }}>
-              {['active', 'favorites', 'ignored'].map(t => (
+              {[
+                { id: 'active', label: 'Todos' },
+                { id: 'vendas', label: 'Vendas' },
+                { id: 'aluguel', label: 'Aluguel' },
+                { id: 'favorites', label: 'Favoritos' },
+                { id: 'ignored', label: 'Trabalhados' }
+              ].map(t => (
                 <button
-                  key={t}
-                  onClick={() => setFilter(t)}
+                  key={t.id}
+                  onClick={() => setFilter(t.id)}
                   style={{
                     flex: 1,
                     padding: '10px',
                     borderRadius: '12px',
-                    background: filter === t ? 'rgba(255,255,255,0.1)' : 'transparent',
-                    color: filter === t ? 'white' : 'var(--text-muted)',
+                    background: filter === t.id ? 'rgba(255,255,255,0.1)' : 'transparent',
+                    color: filter === t.id ? 'white' : 'var(--text-muted)',
                     fontWeight: 600,
                     textTransform: 'capitalize',
-                    minWidth: '100px'
+                    minWidth: '94px',
+                    fontSize: '0.8rem'
                   }}
                 >
-                  {t === 'active' ? 'Todos' : t === 'favorites' ? 'Favoritos' : 'Ignorados'}
+                  {t.label}
                 </button>
               ))}
             </div>
@@ -1099,7 +1143,7 @@ function ListingCard({ listing, onUpdate }) {
             color: isIgnored ? 'var(--accent)' : 'var(--text-muted)',
             padding: '6px'
           }}
-          title={isIgnored ? "Restaurar" : "Ignorar"}
+          title={isIgnored ? "Restaurar" : "Trabalhado"}
         >
           {isIgnored ? <RefreshCw size={18} /> : <Archive size={18} />}
         </button>
