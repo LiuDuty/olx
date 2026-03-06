@@ -345,7 +345,7 @@ function App() {
     });
 
   return (
-    <div className="container" style={{ maxWidth: '800px', margin: '0 auto' }}>
+    <div className="container">
       <AnimatePresence>
         {showSplash && <SplashScreen version={APP_VERSION} />}
         {showTutorial && (
@@ -371,67 +371,46 @@ function App() {
       {!showSplash && !showTutorial && (
         <>
           {/* Header */}
-          <header className="header" style={{ marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
-            <div>
-              <h1 style={{ fontSize: '2rem', fontWeight: 800, background: 'linear-gradient(to right, #6366f1, #f43f5e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+          <header className="header glass-header">
+            <div className="header-info">
+              <h1 className="logo-text">
                 OpenHouses OLX
               </h1>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '5px' }}>
-                <span style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '4px 12px',
-                  background: 'rgba(99, 102, 241, 0.1)',
-                  borderRadius: '20px',
-                  border: '1px solid rgba(99, 102, 241, 0.2)',
-                  color: 'var(--primary)',
-                  fontWeight: 600
-                }}>
-                  <Calendar size={14} />
-                  AGENDADO: {nextRun ? DateTime.fromISO(nextRun).toFormat('dd/MM \'às\' HH:mm') : 'Não agendado'}
-                </span>
-              </p>
+              <div className="agenda-badge">
+                <Calendar size={14} />
+                <span>AGENDADO: {nextRun ? DateTime.fromISO(nextRun).toFormat('dd/MM \'às\' HH:mm') : 'Não agendado'}</span>
+              </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className="glass"
-                style={{
-                  padding: '10px 15px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  color: showFilters ? 'white' : 'var(--text-muted)',
-                  background: showFilters ? 'rgba(99,102,241,0.3)' : 'rgba(255,255,255,0.05)',
-                  border: showFilters ? '1px solid rgba(99,102,241,0.5)' : '1px solid rgba(255,255,255,0.08)',
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
-                  letterSpacing: '0.5px'
-                }}
-              >
-                <Search size={14} />
-                FILTROS
-                {(scraperFilters.regions.length < 3 || scraperFilters.types.length < 2) && (
-                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent)', display: 'inline-block' }} />
-                )}
-              </button>
+            <div className="header-actions">
+              <div className="glass-button-group">
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="glass action-btn"
+                  style={{
+                    color: showFilters ? 'white' : 'var(--text-muted)',
+                    background: showFilters ? 'rgba(99,102,241,0.3)' : 'rgba(255,255,255,0.05)',
+                    border: showFilters ? '1px solid rgba(99,102,241,0.5)' : '1px solid rgba(255,255,255,0.08)',
+                  }}
+                >
+                  <Search size={14} />
+                  <span>FILTROS</span>
+                  {(scraperFilters.regions.length < 3 || scraperFilters.types.length < 2) && (
+                    <span className="filter-notification" />
+                  )}
+                </button>
 
-              <button
-                onClick={() => setShowCalendar(!showCalendar)}
-                className="glass"
-                style={{
-                  padding: '10px 15px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  color: 'white',
-                  background: showCalendar ? 'var(--primary)' : 'rgba(255,255,255,0.05)'
-                }}
-              >
-                <Calendar size={18} />
-              </button>
+                <button
+                  onClick={() => setShowCalendar(!showCalendar)}
+                  className="glass action-btn icon-only"
+                  style={{
+                    color: 'white',
+                    background: showCalendar ? 'var(--primary)' : 'rgba(255,255,255,0.05)'
+                  }}
+                >
+                  <Calendar size={18} />
+                </button>
+              </div>
 
               <div className="glass" style={{ display: 'flex', alignItems: 'center', padding: '5px 12px', gap: '8px' }}>
                 <input
@@ -770,20 +749,18 @@ function App() {
             )}
           </AnimatePresence>
 
-          {/* Search & Tabs */}
-          <div style={{ marginBottom: '25px' }}>
-            <div style={{ position: 'relative', marginBottom: '15px' }}>
-              <Search style={{ position: 'absolute', left: '15px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} size={18} />
+          <div className="search-tabs-container">
+            <div className="search-bar glass">
+              <Search className="search-icon" size={18} />
               <input
                 type="text"
-                placeholder="Pesquisar links, preços ou notas..."
+                placeholder="Pesquisar..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                style={{ paddingLeft: '45px', height: '50px', fontSize: '1rem' }}
               />
             </div>
 
-            <div className="glass" style={{ display: 'flex', padding: '5px', gap: '5px', flexWrap: 'wrap' }}>
+            <div className="glass tabs-nav">
               {[
                 { id: 'active', label: 'Todos' },
                 { id: 'vendas', label: 'Vendas' },
@@ -794,17 +771,7 @@ function App() {
                 <button
                   key={t.id}
                   onClick={() => setFilter(t.id)}
-                  style={{
-                    flex: 1,
-                    padding: '10px',
-                    borderRadius: '12px',
-                    background: filter === t.id ? 'rgba(255,255,255,0.1)' : 'transparent',
-                    color: filter === t.id ? 'white' : 'var(--text-muted)',
-                    fontWeight: 600,
-                    textTransform: 'capitalize',
-                    minWidth: '94px',
-                    fontSize: '0.8rem'
-                  }}
+                  className={filter === t.id ? 'active' : ''}
                 >
                   {t.label}
                 </button>
@@ -965,81 +932,51 @@ function ListingCard({ listing, onUpdate }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      className="glass"
-      style={{
-        padding: '12px 20px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '20px',
-        borderLeft: isIgnored ? '4px solid #f43f5e' : (listing.get("isFavorite") ? '4px solid #f59e0b' : '4px solid transparent')
-      }}
+      className={`glass listing-card ${isIgnored ? 'ignored' : ''} ${listing.get("isFavorite") ? 'favorite' : ''}`}
     >
       {/* Preço (se não for N/A) */}
       {price && price !== 'N/A' && (
-        <div style={{ minWidth: '110px', fontWeight: 800, color: 'var(--success)', fontSize: '1.1rem' }}>
+        <div className="listing-card-price" style={{ minWidth: '100px', fontWeight: 800, color: 'var(--success)', fontSize: '1.2rem' }}>
           {price}
         </div>
       )}
 
-      {/* Telefone e Info Imóvel */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-        {/* Título (se houver) */}
+      {/* Info Principal */}
+      <div className="listing-info">
         {listing.get("title") && (
-          <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '400px' }}>
+          <div className="listing-title">
             {listing.get("title")}
           </div>
         )}
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div className="listing-details-row">
           <a
             href={`tel:${phone ? phone.replace(/\D/g, '') : ''}`}
-            style={{
-              color: 'var(--text-main)',
-              textDecoration: 'none',
-              fontWeight: 700,
-              fontSize: '1rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              background: 'rgba(255,255,255,0.05)',
-              padding: '6px 14px',
-              borderRadius: '8px',
-              transition: 'all 0.2s'
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
-            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+            className="phone-link"
           >
             <Smartphone size={16} color="var(--primary)" />
-            {phone}
+            <span>{phone}</span>
           </a>
 
           {/* Tags região e tipo */}
-          {listing.get('region') && (
-            <span style={{
-              fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.5px', padding: '3px 8px', borderRadius: '6px',
-              background: listing.get('region') === 'alphaville' ? 'rgba(99,102,241,0.25)' : listing.get('region') === 'tambore' ? 'rgba(245,158,11,0.25)' : 'rgba(16,185,129,0.25)',
-              color: listing.get('region') === 'alphaville' ? '#818cf8' : listing.get('region') === 'tambore' ? '#fbbf24' : '#34d399',
-              textTransform: 'uppercase'
-            }}>
-              {listing.get('region') === 'alphaville' ? 'Alphaville' : listing.get('region') === 'tambore' ? 'Tamboré' : 'Barueri'}
-            </span>
-          )}
-          {listing.get('listingType') && (
-            <span style={{
-              fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.5px', padding: '3px 8px', borderRadius: '6px',
-              background: listing.get('listingType') === 'venda' ? 'rgba(99,102,241,0.2)' : 'rgba(244,63,94,0.2)',
-              color: listing.get('listingType') === 'venda' ? '#a5b4fc' : '#fb7185',
-              textTransform: 'uppercase'
-            }}>
-              {listing.get('listingType') === 'venda' ? 'VENDA' : 'ALUGUEL'}
-            </span>
-          )}
+          <div style={{ display: 'flex', gap: '6px' }}>
+            {listing.get('region') && (
+              <span className={`badge ${listing.get('region') === 'alphaville' ? 'badge-region-alpha' : listing.get('region') === 'tambore' ? 'badge-region-tambore' : 'badge-region-other'}`}>
+                {listing.get('region')}
+              </span>
+            )}
+            {listing.get('listingType') && (
+              <span className={`badge ${listing.get('listingType') === 'venda' ? 'badge-type-venda' : 'badge-type-aluguel'}`}>
+                {listing.get('listingType')}
+              </span>
+            )}
+          </div>
 
           {/* Badges de Detalhes */}
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem' }}>
+          <div className="listing-meta">
             {listing.get("rooms") && (
               <span title="Quartos" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <Home size={14} /> {String(listing.get("rooms")).replace(/\D/g, '')}
@@ -1055,16 +992,11 @@ function ListingCard({ listing, onUpdate }) {
                 <Layout size={14} /> {String(listing.get("garage")).replace(/\D/g, '')}
               </span>
             )}
-            {listing.get("condo") && (
-              <span title="Condomínio" style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>
-                Cond: {listing.get("condo")}
-              </span>
-            )}
           </div>
         </div>
 
         {/* Localização, Contato e Data */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.7rem' }}>
+        <div className="listing-location-row">
           {listing.get("location") && (
             <span style={{ color: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', gap: '4px' }}>
               <MapPin size={12} /> {String(listing.get("location")).split(',').slice(0, 2).join(',')}
@@ -1075,18 +1007,11 @@ function ListingCard({ listing, onUpdate }) {
             {(() => {
               const capDate = listing.get("capturedAt") || listing.get("lastUpdated");
               if (!capDate) return '-';
-
               let dt;
-              if (capDate && typeof capDate.toDate === 'function') {
-                dt = DateTime.fromJSDate(capDate.toDate());
-              } else if (typeof capDate === 'string') {
-                dt = DateTime.fromISO(capDate);
-              } else if (capDate && capDate.iso) {
-                dt = DateTime.fromISO(capDate.iso);
-              } else {
-                dt = DateTime.fromJSDate(new Date(capDate));
-              }
-
+              if (capDate && typeof capDate.toDate === 'function') dt = DateTime.fromJSDate(capDate.toDate());
+              else if (typeof capDate === 'string') dt = DateTime.fromISO(capDate);
+              else if (capDate && capDate.iso) dt = DateTime.fromISO(capDate.iso);
+              else dt = DateTime.fromJSDate(new Date(capDate));
               return dt.isValid ? dt.toFormat('dd/MM/yyyy HH:mm') : '-';
             })()}
           </span>
@@ -1099,59 +1024,34 @@ function ListingCard({ listing, onUpdate }) {
         </div>
       </div>
 
-      {/* Link OLX Minimalista */}
-      <a
-        href={listing.get("link")}
-        target="_blank"
-        rel="noopener noreferrer"
-        title="Abrir no OLX"
-        style={{
-          color: 'var(--text-muted)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '5px',
-          fontSize: '0.8rem',
-          textDecoration: 'none',
-          padding: '6px'
-        }}
-      >
-        <ExternalLink size={16} />
-      </a>
+      {/* Ações */}
+      <div className="listing-card-actions">
+        <a
+          href={listing.get("link")}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: 'var(--text-muted)', padding: '8px' }}
+        >
+          <ExternalLink size={18} />
+        </a>
 
-      {/* Ações Rápidas */}
-      <div style={{ display: 'flex', gap: '8px' }}>
         <button
           onClick={() => setShowNote(!showNote)}
-          style={{
-            background: showNote ? 'var(--primary)' : 'transparent',
-            color: showNote ? 'white' : 'var(--text-muted)',
-            padding: '6px'
-          }}
-          title="Ver Notas"
+          style={{ color: showNote ? 'var(--primary)' : 'var(--text-muted)' }}
         >
           <MessageSquare size={18} />
         </button>
 
         <button
           onClick={() => onUpdate(listing, { isFavorite: !listing.get("isFavorite") })}
-          style={{
-            background: 'transparent',
-            color: listing.get("isFavorite") ? '#f59e0b' : 'var(--text-muted)',
-            padding: '6px'
-          }}
-          title="Favoritar"
+          style={{ color: listing.get("isFavorite") ? '#f59e0b' : 'var(--text-muted)' }}
         >
           <Star fill={listing.get("isFavorite") ? "#f59e0b" : "none"} size={20} />
         </button>
 
         <button
           onClick={() => onUpdate(listing, { status: isIgnored ? 'active' : 'ignored' })}
-          style={{
-            background: 'transparent',
-            color: isIgnored ? 'var(--accent)' : 'var(--text-muted)',
-            padding: '6px'
-          }}
-          title={isIgnored ? "Restaurar" : "Trabalhado"}
+          style={{ color: isIgnored ? 'var(--accent)' : 'var(--text-muted)' }}
         >
           {isIgnored ? <RefreshCw size={18} /> : <Archive size={18} />}
         </button>
@@ -1161,47 +1061,34 @@ function ListingCard({ listing, onUpdate }) {
       <AnimatePresence>
         {showNote && (
           <motion.div
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: '250px', opacity: 1 }}
-            exit={{ width: 0, opacity: 0 }}
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
             style={{
               position: 'absolute',
-              right: '220px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              zIndex: 10,
-              background: 'var(--bg-dark)',
+              right: '25px', top: '70px',
+              zIndex: 10, background: 'var(--bg-dark)',
               border: '1px solid rgba(255,255,255,0.1)',
-              padding: '10px',
-              borderRadius: '10px',
-              boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '8px'
+              padding: '12px', borderRadius: '14px',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.6)',
+              display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '200px'
             }}
           >
             <textarea
-              rows="2"
+              rows="3"
               placeholder="Notas..."
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              style={{ fontSize: '0.8rem', width: '100%', background: 'rgba(255,255,255,0.05)' }}
+              style={{ fontSize: '0.85rem' }}
             />
             <button
               onClick={() => {
                 onUpdate(listing, { notes: note });
                 setShowNote(false);
               }}
-              style={{
-                background: 'var(--primary)',
-                color: 'white',
-                padding: '5px',
-                borderRadius: '6px',
-                fontSize: '0.75rem',
-                fontWeight: 700
-              }}
+              style={{ background: 'var(--primary)', color: 'white', padding: '8px', borderRadius: '8px', fontWeight: 700 }}
             >
-              SALVAR
+              SALVAR NOTA
             </button>
           </motion.div>
         )}
