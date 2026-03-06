@@ -89,6 +89,7 @@ function App() {
     if (!showSplash && !showTutorial) {
       fetchConfig();
       fetchStatus();
+      fetchListings(); // <--- CHAMADA IMEDIATA PARA NÃO FICAR PRESO NO LOADING
 
       // Intervalo mais rápido se estiver extraindo (2s), senão 15s
       const intervalTime = isScraping ? 2000 : 15000;
@@ -151,6 +152,7 @@ function App() {
       // Buscamos os itens sem filtros complexos para evitar erro de índice no Firestore
       const querySnapshot = await getDocs(listingsRef);
       console.log(`✅ [Firebase] ${querySnapshot.size} documentos recebidos.`);
+      const results = [];
       querySnapshot.forEach((doc) => {
         const item = doc.data();
         results.push({
