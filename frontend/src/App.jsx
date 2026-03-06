@@ -145,11 +145,12 @@ function App() {
 
   const fetchListings = async () => {
     try {
+      setLoading(true);
+      console.log("⚡ [Firebase] Iniciando busca de anúncios...");
       const listingsRef = collection(db, "listings");
       // Buscamos os itens sem filtros complexos para evitar erro de índice no Firestore
       const querySnapshot = await getDocs(listingsRef);
-
-      const results = [];
+      console.log(`✅ [Firebase] ${querySnapshot.size} documentos recebidos.`);
       querySnapshot.forEach((doc) => {
         const item = doc.data();
         results.push({
@@ -175,9 +176,10 @@ function App() {
 
       setListings(filtered);
     } catch (error) {
-      console.error("Error fetching listings:", error);
+      console.error("❌ [Firebase] Erro ao buscar anúncios:", error);
     } finally {
       setLoading(false);
+      console.log("🏁 [Frontend] Ciclo de carregamento finalizado.");
     }
   };
 
@@ -323,11 +325,14 @@ function App() {
   };
 
   const filteredListings = listings
-    .filter(l =>
-      l.get("price")?.toLowerCase().includes(search.toLowerCase()) ||
-      l.get("link")?.toLowerCase().includes(search.toLowerCase()) ||
-      (l.get("notes") || "").toLowerCase().includes(search.toLowerCase())
-    )
+    .filter(l => {
+      if (!l) return false;
+      const s = String(search || "").toLowerCase();
+      const p = String(l.get("price") || "").toLowerCase();
+      const lnk = String(l.get("link") || "").toLowerCase();
+      const n = String(l.get("notes") || "").toLowerCase();
+      return p.includes(s) || lnk.includes(s) || n.includes(s);
+    })
     .sort((a, b) => {
       const getVal = (obj) => {
         const d = toDate(obj.get("capturedAt") || obj.get("lastUpdated"));
