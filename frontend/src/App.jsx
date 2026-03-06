@@ -968,59 +968,47 @@ function ListingCard({ listing, onUpdate }) {
       exit={{ opacity: 0, scale: 0.95 }}
       className={`glass listing-card ${isIgnored ? 'ignored' : ''} ${listing.get("isFavorite") ? 'favorite' : ''}`}
     >
-      {/* Preço (se não for N/A) */}
-      {price && price !== 'N/A' && (
-        <div className="listing-card-price" style={{ minWidth: '100px', fontWeight: 800, color: 'var(--success)', fontSize: '1.2rem' }}>
-          {price}
-        </div>
-      )}
-
-      {/* Info Principal */}
+      {/* Container Esquerdo: Preço e Título */}
       <div className="listing-info">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%', marginBottom: '5px' }}>
+          <div className="listing-card-price">
+            {price && price !== 'N/A' ? price : 'Consulte'}
+          </div>
+
+          <div style={{ display: 'flex', gap: '6px' }}>
+            {/* Tags removidas por solicitação */}
+          </div>
+        </div>
+
         {listing.get("title") && (
-          <div className="listing-title">
+          <div className="listing-title" style={{ fontSize: '1rem', marginBottom: '12px' }}>
             {listing.get("title")}
           </div>
         )}
 
         <div className="listing-details-row">
-          <a
-            href={`tel:${phone ? phone.replace(/\D/g, '') : ''}`}
-            className="phone-link"
-          >
-            <Smartphone size={16} color="var(--primary)" />
-            <span>{phone}</span>
-          </a>
+          {/* Fone removido daqui por solicitação do usuário */}
 
-          {/* Tags região e tipo */}
-          <div style={{ display: 'flex', gap: '6px' }}>
-            {listing.get('region') && (
-              <span className={`badge ${listing.get('region') === 'alphaville' ? 'badge-region-alpha' : listing.get('region') === 'tambore' ? 'badge-region-tambore' : 'badge-region-other'}`}>
-                {listing.get('region')}
-              </span>
-            )}
-            {listing.get('listingType') && (
-              <span className={`badge ${listing.get('listingType') === 'venda' ? 'badge-type-venda' : 'badge-type-aluguel'}`}>
-                {listing.get('listingType')}
-              </span>
-            )}
-          </div>
-
-          {/* Badges de Detalhes */}
-          <div className="listing-meta">
-            {listing.get("rooms") && (
-              <span title="Quartos" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          {/* Badges de Detalhes (Oculta N/D) */}
+          <div className="listing-meta" style={{ background: 'rgba(255,255,255,0.05)', padding: '4px 12px', borderRadius: '10px', display: 'flex', gap: '15px' }}>
+            {listing.get("rooms") && listing.get("rooms") !== 'N/D' && (
+              <span title="Quartos" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem' }}>
                 <Home size={14} /> {String(listing.get("rooms")).replace(/\D/g, '')}
               </span>
             )}
-            {listing.get("area") && (
-              <span title="Área" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            {listing.get("area") && listing.get("area") !== 'N/D' && (
+              <span title="Área" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem' }}>
                 <Maximize size={14} /> {listing.get("area")}
               </span>
             )}
-            {listing.get("garage") && (
-              <span title="Vagas" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            {listing.get("garage") && listing.get("garage") !== 'N/D' && (
+              <span title="Vagas" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem' }}>
                 <Layout size={14} /> {String(listing.get("garage")).replace(/\D/g, '')}
+              </span>
+            )}
+            {listing.get("bathrooms") && listing.get("bathrooms") !== 'N/D' && (
+              <span title="Banheiros" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem' }}>
+                <Droplets size={14} /> {String(listing.get("bathrooms")).replace(/\D/g, '')}
               </span>
             )}
           </div>
@@ -1028,11 +1016,13 @@ function ListingCard({ listing, onUpdate }) {
 
         {/* Localização, Contato e Data */}
         <div className="listing-location-row">
-          {listing.get("location") && (
-            <span style={{ color: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <MapPin size={12} /> {String(listing.get("location")).split(',').slice(0, 2).join(',')}
-            </span>
-          )}
+          {listing.get("location") &&
+            listing.get("location") !== 'N/D' &&
+            listing.get("location") !== 'Alphaville/Tamboré' && (
+              <span style={{ color: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <MapPin size={12} /> {String(listing.get("location")).split(',').slice(0, 2).join(',')}
+              </span>
+            )}
 
           <span style={{ color: 'rgba(255,255,255,0.2)', fontWeight: 500 }}>
             {(() => {

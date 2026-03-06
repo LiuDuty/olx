@@ -63,9 +63,15 @@
 }
 
 .container {
-  max-width: 800px;
-  margin: 0 auto;
   width: 100%;
+  max-width: 900px;
+  /* Evita que estique demais em telas grandes */
+  margin: 0 auto;
+  padding: 20px 15px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
 }
 
 body {
@@ -75,7 +81,10 @@ body {
     radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0, transparent 50%),
     radial-gradient(at 100% 100%, rgba(244, 63, 94, 0.1) 0, transparent 50%);
   min-height: 100vh;
-  padding: 20px;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  width: 100%;
 }
 
 button {
@@ -218,12 +227,15 @@ button:active {
 
 /* Listing Card Styles */
 .listing-card {
-  margin-bottom: 20px;
-  display: flex !important;
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 20px;
-  padding: 15px 25px;
-  border-left: 4px solid transparent;
+  padding: 16px 24px;
+  margin-bottom: 12px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  position: relative;
+  border-radius: 20px;
 }
 
 .listing-card.favorite {
@@ -240,6 +252,15 @@ button:active {
   flex-direction: column;
   gap: 6px;
   min-width: 0;
+  /* Permite que o texto trunque se necessário */
+}
+
+.listing-card-price {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #10b981;
+  text-shadow: 0 0 10px rgba(16, 185, 129, 0.2);
+  min-width: 130px;
 }
 
 .listing-title {
@@ -379,11 +400,12 @@ textarea:focus {
 /* Mobile Responsiveness Premium */
 @media (max-width: 768px) {
   body {
-    padding: 15px;
+    padding: 0;
   }
 
   .container {
-    padding: 0 !important;
+    padding: 10px !important;
+    max-width: 100%;
   }
 
   header {
@@ -392,16 +414,18 @@ textarea:focus {
     text-align: center;
     margin-bottom: 25px !important;
     gap: 15px !important;
+    padding: 0 10px;
   }
 
   header h1 {
-    font-size: 1.8rem !important;
+    font-size: 1.6rem !important;
   }
 
   header>div:last-child {
     width: 100%;
     justify-content: center;
     flex-wrap: wrap;
+    gap: 10px !important;
   }
 
   /* Ajuste para botões não quebrarem em telas pequenas */
@@ -432,26 +456,39 @@ textarea:focus {
   /* Listing Card Mobile */
   .listing-card {
     flex-direction: column !important;
-    align-items: stretch !important;
-    gap: 18px !important;
+    align-items: center !important;
+    text-align: center;
+    gap: 12px !important;
     padding: 20px !important;
-    margin-bottom: 20px !important;
+    margin-bottom: 16px !important;
+    border-radius: 24px !important;
   }
 
   .listing-card-price {
     min-width: 0 !important;
-    font-size: 1.5rem !important;
-    text-align: center;
+    font-size: 1.6rem !important;
+    margin-bottom: 5px;
+    width: 100%;
   }
 
   .listing-info {
     width: 100%;
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    text-align: center;
+    gap: 8px;
+  }
+
+  .listing-title {
+    font-size: 1.1rem !important;
+    margin-bottom: 5px !important;
+    font-weight: 700;
   }
 
   .listing-details-row {
     flex-direction: column !important;
+    align-items: center !important;
+    gap: 10px !important;
     width: 100%;
   }
 
