@@ -19,7 +19,8 @@ import {
   Copy,
   Maximize,
   MapPin,
-  X
+  X,
+  Smartphone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import CalendarBox from 'react-calendar';
