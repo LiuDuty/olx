@@ -63,6 +63,7 @@ function App() {
   const [scheduledTime, setScheduledTime] = useState('07:00');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showFilters, setShowFilters] = useState(false);
+  const [currentRequestId, setCurrentRequestId] = useState(null);
   const [scraperFilters, setScraperFilters] = useState({
     regions: ['alphaville', 'tambore', 'barueri'],
     types: ['venda'],
@@ -269,6 +270,7 @@ function App() {
       });
 
       console.log(`Pedido de extração enviado: ${requestRef.id}`);
+      setCurrentRequestId(requestRef.id);
 
       // Atualiza o status visual para feedback imediato
       const statusRef = doc(db, "system", "status");
@@ -280,6 +282,28 @@ function App() {
 
     } catch (error) {
       console.error("Erro ao disparar scraper:", error);
+    }
+  };
+
+  const cancelScraper = async () => {
+    if (!currentRequestId) return;
+    try {
+      setIsScraping(false);
+      // Sinalizar cancelamento no Firestore
+      const requestRef = doc(db, "requests", currentRequestId);
+      await updateDoc(requestRef, { status: 'cancelled' });
+
+      const statusRef = doc(db, "system", "status");
+      await setDoc(statusRef, {
+        message: "🔴 EXTRAÇÃO CANCELADA PELO USUÁRIO",
+        progress: 0,
+        lastUpdate: new Date()
+      }, { merge: true });
+
+      setCurrentRequestId(null);
+      console.log("Extração cancelada pelo usuário.");
+    } catch (error) {
+      console.error("Erro ao cancelar scraper:", error);
     }
   };
 
@@ -709,6 +733,32 @@ function App() {
                   </span>
                   <span style={{ fontSize: '0.9rem', color: 'white' }}>{liveStatus.progress}%</span>
                 </div>
+
+                {/* Botão de Cancelar (SÓ APARECE DURANTE SCRAPING) */}
+                {isScraping && (
+                  <button
+                    onClick={cancelScraper}
+                    style={{
+                      position: 'absolute',
+                      top: '15px',
+                      right: '15px',
+                      background: 'rgba(244, 63, 94, 0.2)',
+                      color: '#f43f5e',
+                      border: '1px solid rgba(244, 63, 94, 0.4)',
+                      padding: '5px 12px',
+                      borderRadius: '8px',
+                      fontSize: '0.7rem',
+                      fontWeight: 800,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <X size={14} />
+                    PARAR AGORA
+                  </button>
+                )}
 
                 <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '10px', overflow: 'hidden', marginBottom: '15px' }}>
                   <motion.div
