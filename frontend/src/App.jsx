@@ -45,7 +45,7 @@ import {
   writeBatch
 } from "firebase/firestore";
 
-const APP_VERSION = "2.1.0"; // Versão atual para controle de release
+const APP_VERSION = "2.1.1"; // Versão atual para controle de release
 
 function App() {
   const [showSplash, setShowSplash] = useState(true);
@@ -891,26 +891,109 @@ function SplashScreen({ version }) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       style={{
-        position: 'fixed', inset: 0, zIndex: 9999, background: 'var(--bg-dark)',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
+        position: 'fixed', inset: 0, zIndex: 9999, background: '#030712',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        overflow: 'hidden'
       }}
     >
+      {/* Background Decorative Elements */}
       <motion.div
-        initial={{ scale: 0.8, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ delay: 0.2 }}
-        style={{ textAlign: 'center' }}
+        animate={{
+          scale: [1, 1.2, 1],
+          rotate: [0, 90, 0],
+          opacity: [0.1, 0.2, 0.1]
+        }}
+        transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+        style={{
+          position: 'absolute', width: '600px', height: '600px',
+          background: 'radial-gradient(circle, var(--primary) 0%, transparent 70%)',
+          filter: 'blur(100px)', zIndex: 0
+        }}
+      />
+
+      <motion.div
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.8, ease: "easeOut" }}
+        style={{ textAlign: 'center', zIndex: 1, position: 'relative' }}
       >
-        <div style={{
-          width: '80px', height: '80px', background: 'linear-gradient(135deg, var(--primary), var(--accent))',
-          borderRadius: '22px', margin: '0 auto 20px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 0 30px rgba(99, 102, 241, 0.5)'
-        }}>
-          <RefreshCw size={40} color="white" className="spin" />
+        <div style={{ position: 'relative', width: '120px', height: '120px', margin: '0 auto 30px' }}>
+          {/* Outer Ring */}
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+            style={{
+              position: 'absolute', inset: 0,
+              border: '2px dashed rgba(99, 102, 241, 0.3)',
+              borderRadius: '50%'
+            }}
+          />
+
+          {/* Main Icon Container */}
+          <motion.div
+            initial={{ scale: 0.5, rotate: -20 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ type: "spring", stiffness: 200, damping: 15 }}
+            style={{
+              width: '100%', height: '100%',
+              background: 'linear-gradient(135deg, #6366f1, #f43f5e)',
+              borderRadius: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 20px 40px rgba(99, 102, 241, 0.4)',
+              position: 'relative', zIndex: 2
+            }}
+          >
+            <Home size={60} color="white" />
+          </motion.div>
+
+          {/* Floating Sparkles */}
+          {[0, 1, 2].map(i => (
+            <motion.div
+              key={i}
+              animate={{
+                y: [-10, 10, -10],
+                x: [-10, 10, -10],
+                opacity: [0, 1, 0]
+              }}
+              transition={{ duration: 2 + i, repeat: Infinity, delay: i * 0.5 }}
+              style={{
+                position: 'absolute', width: '8px', height: '8px',
+                background: 'white', borderRadius: '50%',
+                top: `${20 + i * 30}%`, left: `${10 + i * 40}%`,
+                boxShadow: '0 0 10px white'
+              }}
+            />
+          ))}
         </div>
-        <h1 style={{ fontSize: '2.5rem', fontWeight: 900, marginBottom: '5px' }}>OpenHouses</h1>
-        <p style={{ color: 'var(--primary)', fontWeight: 700, letterSpacing: '2px' }}>V {version}</p>
-        <div style={{ marginTop: '20px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Carregando seus dados...</div>
+
+        <motion.h1
+          initial={{ letterSpacing: "10px", opacity: 0 }}
+          animate={{ letterSpacing: "4px", opacity: 1 }}
+          transition={{ duration: 1, delay: 0.3 }}
+          style={{ fontSize: '2.8rem', fontWeight: 900, marginBottom: '10px', color: 'white' }}
+        >
+          OPENHOUSES
+        </motion.h1>
+
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: "100%" }}
+          transition={{ duration: 1.5, delay: 0.5 }}
+          style={{ height: '2px', background: 'linear-gradient(90deg, transparent, var(--primary), transparent)', margin: '0 auto 15px', maxWidth: '200px' }}
+        />
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+          <span style={{ color: 'var(--primary)', fontWeight: 800, fontSize: '0.8rem', background: 'rgba(99, 102, 241, 0.1)', padding: '4px 12px', borderRadius: '20px', border: '1px solid rgba(99, 102, 241, 0.2)' }}>
+            V {version}
+          </span>
+        </div>
+
+        <motion.p
+          animate={{ opacity: [0.4, 1, 0.4] }}
+          transition={{ duration: 2, repeat: Infinity }}
+          style={{ marginTop: '30px', color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 600, letterSpacing: '2px', textTransform: 'uppercase' }}
+        >
+          Conectando Oportunidades...
+        </motion.p>
       </motion.div>
     </motion.div>
   );
