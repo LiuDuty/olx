@@ -555,6 +555,140 @@ function App() {
 
             </div>
 
+            {/* Painéis de Configuração (Movidos para cima) */}
+            <AnimatePresence>
+              {showFilters && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="glass"
+                  style={{ marginBottom: '15px', padding: '20px', overflow: 'hidden', border: '1px solid rgba(99,102,241,0.2)' }}
+                >
+                  <h4 style={{ marginBottom: '16px', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '1px', textTransform: 'uppercase', color: 'var(--primary)' }}>
+                    ⚙️ Configuração da Busca
+                  </h4>
+
+                  <div className="filters-grid">
+                    {/* Regiões */}
+                    <div>
+                      <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>📍 Regiões</p>
+                      {[{ id: 'alphaville', label: 'Alphaville', color: '#6366f1' }, { id: 'tambore', label: 'Tamboré', color: '#f59e0b' }, { id: 'barueri', label: 'Barueri', color: '#10b981' }].map(r => (
+                        <label key={r.id} onClick={() => toggleRegion(r.id)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', marginBottom: '6px', borderRadius: '8px', cursor: 'pointer', background: scraperFilters.regions.includes(r.id) ? `${r.color}22` : 'rgba(255,255,255,0.03)', border: `1px solid ${scraperFilters.regions.includes(r.id) ? r.color + '55' : 'rgba(255,255,255,0.08)'}`, transition: 'all 0.2s' }}>
+                          <span style={{ width: '18px', height: '18px', borderRadius: '5px', background: scraperFilters.regions.includes(r.id) ? r.color : 'transparent', border: `2px solid ${scraperFilters.regions.includes(r.id) ? r.color : 'rgba(255,255,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', transition: 'all 0.2s' }}>
+                            {scraperFilters.regions.includes(r.id) ? '✓' : ''}
+                          </span>
+                          <span style={{ fontWeight: 600, fontSize: '0.9rem', color: scraperFilters.regions.includes(r.id) ? 'white' : 'var(--text-muted)' }}>{r.label}</span>
+                        </label>
+                      ))}
+                    </div>
+
+                    {/* Tipo + Preço */}
+                    <div>
+                      <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🏠 Tipo de Negócio</p>
+                      {[{ id: 'venda', label: 'Venda', color: '#6366f1' }, { id: 'aluguel', label: 'Aluguel', color: '#f43f5e' }].map(t => (
+                        <label key={t.id} onClick={() => toggleType(t.id)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', marginBottom: '6px', borderRadius: '8px', cursor: 'pointer', background: scraperFilters.types.includes(t.id) ? `${t.color}22` : 'rgba(255,255,255,0.03)', border: `1px solid ${scraperFilters.types.includes(t.id) ? t.color + '55' : 'rgba(255,255,255,0.08)'}`, transition: 'all 0.2s' }}>
+                          <span style={{ width: '18px', height: '18px', borderRadius: '5px', background: scraperFilters.types.includes(t.id) ? t.color : 'transparent', border: `2px solid ${scraperFilters.types.includes(t.id) ? t.color : 'rgba(255,255,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', transition: 'all 0.2s' }}>
+                            {scraperFilters.types.includes(t.id) ? '✓' : ''}
+                          </span>
+                          <span style={{ fontWeight: 600, fontSize: '0.9rem', color: scraperFilters.types.includes(t.id) ? 'white' : 'var(--text-muted)' }}>{t.label}</span>
+                        </label>
+                      ))}
+                      {scraperFilters.types.includes('venda') && (
+                        <div style={{ marginTop: '14px' }}>
+                          <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>💰 Faixa (Venda)</p>
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <select
+                              value={scraperFilters.priceMin}
+                              onChange={e => saveScraperFilters({ ...scraperFilters, priceMin: parseInt(e.target.value) })}
+                              style={{ flex: 1, background: 'var(--bg-dark)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', padding: '6px', fontSize: '0.8rem' }}
+                            >
+                              {[500000, 1000000, 2000000, 3000000, 5000000, 10000000].map(v => <option key={v} value={v}>R$ {(v / 1000000).toFixed(1)}M</option>)}
+                            </select>
+                            <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>atê</span>
+                            <select
+                              value={scraperFilters.priceMax}
+                              onChange={e => saveScraperFilters({ ...scraperFilters, priceMax: parseInt(e.target.value) })}
+                              style={{ flex: 1, background: 'var(--bg-dark)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', padding: '6px', fontSize: '0.8rem' }}
+                            >
+                              {[1000000, 5000000, 10000000, 20000000, 30000000, 50000000, 100000000].map(v => <option key={v} value={v}>R$ {(v / 1000000).toFixed(0)}M</option>)}
+                            </select>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+              {showCalendar && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="glass"
+                  style={{ marginBottom: '15px', padding: '15px', overflow: 'hidden', maxWidth: '320px', margin: '0 auto 15px' }}
+                >
+                  <div className="calendar-section" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginBottom: '10px' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase' }}>Horários Diários</span>
+                      <button onClick={() => setShowCalendar(false)} style={{ background: 'transparent', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}>
+                        <X size={14} />
+                      </button>
+                    </div>
+
+                    <div style={{ width: '100%', display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+                      {schedules && schedules.map(time => (
+                        <div key={time} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(99, 102, 241, 0.12)', padding: '6px 12px', borderRadius: '100px', border: '1px solid rgba(99, 102, 241, 0.2)', color: 'white', fontSize: '0.8rem', fontWeight: 700 }}>
+                          <Clock size={12} /> {time}
+                          <button onClick={() => removeSchedule(time)} style={{ background: 'transparent', display: 'flex', alignItems: 'center', color: '#f43f5e', padding: 0, marginLeft: '4px' }}>
+                            <XCircle size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px', width: '100%', background: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '12px', alignItems: 'center' }}>
+                      <input type="time" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '0.95rem', fontWeight: 800, flex: 1, outline: 'none' }} />
+                      <button onClick={addSchedule} style={{ background: 'var(--primary)', color: 'white', padding: '8px 15px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800 }}><Plus size={14} /></button>
+                    </div>
+
+                    <button onClick={() => { runScraper(); setShowCalendar(false); }} style={{ width: '100%', background: 'rgba(244, 63, 94, 0.1)', color: '#f43f5e', border: '1px solid rgba(244, 63, 94, 0.2)', padding: '10px', borderRadius: '12px', fontWeight: 800, fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                      <Activity size={16} /> Extrair Agora
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+              {showMonitor && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="glass"
+                  style={{ marginBottom: '15px', padding: '20px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--primary)', position: 'relative' }}
+                >
+                  {!isScraping && (
+                    <button onClick={() => setShowMonitor(false)} style={{ position: 'absolute', top: '15px', right: '15px', background: 'rgba(255,255,255,0.05)', color: 'white', border: 'none', cursor: 'pointer', width: '30px', height: '30px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={18} /></button>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--primary)', textTransform: 'uppercase' }}>Monitor Extracão Live</span>
+                    <span style={{ fontSize: '0.9rem', color: 'white' }}>{liveStatus.progress}%</span>
+                  </div>
+                  <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '10px', overflow: 'hidden', marginBottom: '15px' }}>
+                    <motion.div style={{ height: '100%', background: 'linear-gradient(90deg, var(--primary), var(--accent))' }} animate={{ width: `${liveStatus.progress}%` }} />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '0.95rem', color: 'white' }}>{liveStatus.message}</span>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             <div className="search-tabs-container" style={{ margin: '15px 0 10px 0' }}>
               <div className="search-bar" style={{ marginBottom: '10px' }}>
                 <Search className="search-icon" size={18} />
@@ -630,332 +764,6 @@ function App() {
         </>
       )}
 
-      {/* Painel de Filtros do Scraper */}
-      <AnimatePresence>
-        {showFilters && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="glass"
-            style={{ marginBottom: '25px', padding: '20px', overflow: 'hidden', border: '1px solid rgba(99,102,241,0.2)' }}
-          >
-            <h4 style={{ marginBottom: '16px', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '1px', textTransform: 'uppercase', color: 'var(--primary)' }}>
-              ⚙️ Configuração da Busca
-            </h4>
-
-            <div className="filters-grid">
-              {/* Regiões */}
-              <div>
-                <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>📍 Regiões</p>
-                {[{ id: 'alphaville', label: 'Alphaville', color: '#6366f1' }, { id: 'tambore', label: 'Tamboré', color: '#f59e0b' }, { id: 'barueri', label: 'Barueri', color: '#10b981' }].map(r => (
-                  <label key={r.id} onClick={() => toggleRegion(r.id)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', marginBottom: '6px', borderRadius: '8px', cursor: 'pointer', background: scraperFilters.regions.includes(r.id) ? `${r.color}22` : 'rgba(255,255,255,0.03)', border: `1px solid ${scraperFilters.regions.includes(r.id) ? r.color + '55' : 'rgba(255,255,255,0.08)'}`, transition: 'all 0.2s' }}>
-                    <span style={{ width: '18px', height: '18px', borderRadius: '5px', background: scraperFilters.regions.includes(r.id) ? r.color : 'transparent', border: `2px solid ${scraperFilters.regions.includes(r.id) ? r.color : 'rgba(255,255,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', transition: 'all 0.2s' }}>
-                      {scraperFilters.regions.includes(r.id) ? '✓' : ''}
-                    </span>
-                    <span style={{ fontWeight: 600, fontSize: '0.9rem', color: scraperFilters.regions.includes(r.id) ? 'white' : 'var(--text-muted)' }}>{r.label}</span>
-                  </label>
-                ))}
-              </div>
-
-              {/* Tipo + Preço */}
-              <div>
-                <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🏠 Tipo de Negócio</p>
-                {[{ id: 'venda', label: 'Venda', color: '#6366f1' }, { id: 'aluguel', label: 'Aluguel', color: '#f43f5e' }].map(t => (
-                  <label key={t.id} onClick={() => toggleType(t.id)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', marginBottom: '6px', borderRadius: '8px', cursor: 'pointer', background: scraperFilters.types.includes(t.id) ? `${t.color}22` : 'rgba(255,255,255,0.03)', border: `1px solid ${scraperFilters.types.includes(t.id) ? t.color + '55' : 'rgba(255,255,255,0.08)'}`, transition: 'all 0.2s' }}>
-                    <span style={{ width: '18px', height: '18px', borderRadius: '5px', background: scraperFilters.types.includes(t.id) ? t.color : 'transparent', border: `2px solid ${scraperFilters.types.includes(t.id) ? t.color : 'rgba(255,255,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', transition: 'all 0.2s' }}>
-                      {scraperFilters.types.includes(t.id) ? '✓' : ''}
-                    </span>
-                    <span style={{ fontWeight: 600, fontSize: '0.9rem', color: scraperFilters.types.includes(t.id) ? 'white' : 'var(--text-muted)' }}>{t.label}</span>
-                  </label>
-                ))}
-                {scraperFilters.types.includes('venda') && (
-                  <div style={{ marginTop: '14px' }}>
-                    <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>💰 Faixa de Preço (Venda)</p>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <select
-                        value={scraperFilters.priceMin}
-                        onChange={e => saveScraperFilters({ ...scraperFilters, priceMin: parseInt(e.target.value) })}
-                        style={{ flex: 1, background: 'var(--bg-dark)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', padding: '6px', fontSize: '0.8rem' }}
-                      >
-                        {[500000, 1000000, 2000000, 3000000, 5000000, 10000000].map(v => <option key={v} value={v}>R$ {(v / 1000000).toFixed(1)}M</option>)}
-                      </select>
-                      <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>até</span>
-                      <select
-                        value={scraperFilters.priceMax}
-                        onChange={e => saveScraperFilters({ ...scraperFilters, priceMax: parseInt(e.target.value) })}
-                        style={{ flex: 1, background: 'var(--bg-dark)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', padding: '6px', fontSize: '0.8rem' }}
-                      >
-                        {[1000000, 5000000, 10000000, 20000000, 30000000, 50000000, 100000000].map(v => <option key={v} value={v}>R$ {(v / 1000000).toFixed(0)}M</option>)}
-                      </select>
-                    </div>
-                  </div>
-                )}
-
-                {scraperFilters.types.includes('aluguel') && (
-                  <div style={{ marginTop: '14px' }}>
-                    <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🔑 Faixa de Preço (Aluguel)</p>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <select
-                        value={scraperFilters.priceMinAluguel || 1000}
-                        onChange={e => saveScraperFilters({ ...scraperFilters, priceMinAluguel: parseInt(e.target.value) })}
-                        style={{ flex: 1, background: 'var(--bg-dark)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', padding: '6px', fontSize: '0.8rem' }}
-                      >
-                        {[500, 1000, 2000, 3000, 5000, 10000].map(v => <option key={v} value={v}>R$ {(v / 1000).toFixed(1)}k</option>)}
-                      </select>
-                      <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>até</span>
-                      <select
-                        value={scraperFilters.priceMaxAluguel || 50000}
-                        onChange={e => saveScraperFilters({ ...scraperFilters, priceMaxAluguel: parseInt(e.target.value) })}
-                        style={{ flex: 1, background: 'var(--bg-dark)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', padding: '6px', fontSize: '0.8rem' }}
-                      >
-                        {[5000, 10000, 20000, 30000, 50000, 100000].map(v => <option key={v} value={v}>R$ {(v / 1000).toFixed(0)}k</option>)}
-                      </select>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Resumo visual */}
-            <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(99,102,241,0.08)', borderRadius: '10px', border: '1px solid rgba(99,102,241,0.15)', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              🔍 Buscando: <b style={{ color: 'white' }}>{scraperFilters.regions.join(', ')}</b> · Tipo: <b style={{ color: 'white' }}>{scraperFilters.types.join(', ')}</b>
-              {scraperFilters.types.includes('venda') && <> · Venda: <b style={{ color: 'white' }}>R${(scraperFilters.priceMin / 1000000).toFixed(1)}M+</b></>}
-              {scraperFilters.types.includes('aluguel') && <> · Aluguel: <b style={{ color: 'white' }}>R${(scraperFilters.priceMinAluguel / 1000).toFixed(1)}k+</b></>}
-              · Apenas particulares
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Calendário de Agendamento */}
-      <AnimatePresence>
-        {showCalendar && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="glass"
-            style={{ marginBottom: '25px', padding: '15px', overflow: 'hidden', maxWidth: '320px', margin: '0 auto 25px' }}
-          >
-            <div className="calendar-section" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginBottom: '10px' }}>
-                <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase' }}>Horários de Extração Diária</span>
-                <button onClick={() => setShowCalendar(false)} style={{ background: 'transparent', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}>
-                  <X size={14} />
-                </button>
-              </div>
-
-              {/* Lista de Horários */}
-              <div style={{ width: '100%', display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
-                {schedules && schedules.map(time => (
-                  <div key={time} style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    background: 'rgba(99, 102, 241, 0.12)',
-                    padding: '6px 12px',
-                    borderRadius: '100px',
-                    border: '1px solid rgba(99, 102, 241, 0.2)',
-                    color: 'white',
-                    fontSize: '0.8rem',
-                    fontWeight: 700
-                  }}>
-                    <Clock size={12} />
-                    {time}
-                    <button onClick={() => removeSchedule(time)} style={{ background: 'transparent', display: 'flex', alignItems: 'center', color: '#f43f5e', padding: 0, marginLeft: '4px' }}>
-                      <XCircle size={14} />
-                    </button>
-                  </div>
-                ))}
-                {(!schedules || schedules.length === 0) && (
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', width: '100%', opacity: 0.6 }}>Nenhum horário diário configurado.</p>
-                )}
-              </div>
-
-              <div style={{ display: 'flex', gap: '8px', width: '100%', background: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '12px', alignItems: 'center' }}>
-                <input
-                  type="time"
-                  value={scheduledTime}
-                  onChange={(e) => setScheduledTime(e.target.value)}
-                  style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '0.95rem', fontWeight: 800, flex: 1, outline: 'none' }}
-                />
-                <button onClick={addSchedule} style={{ background: 'var(--primary)', color: 'white', padding: '8px 15px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800 }}>
-                  <Plus size={14} />
-                </button>
-              </div>
-
-              <div style={{ width: '100%', height: '1px', background: 'rgba(255,255,255,0.05)' }} />
-
-              <button
-                onClick={() => {
-                  runScraper();
-                  setScheduledTime('');
-                  setShowCalendar(false);
-                }}
-                style={{
-                  width: '100%',
-                  background: 'rgba(244, 63, 94, 0.1)',
-                  color: '#f43f5e',
-                  border: '1px solid rgba(244, 63, 94, 0.2)',
-                  padding: '10px',
-                  borderRadius: '12px',
-                  fontWeight: 800,
-                  fontSize: '0.8rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px'
-                }}
-              >
-                <Activity size={16} />
-                Extrair Agora
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Monitor em Tempo Real */}
-      <AnimatePresence>
-        {showMonitor && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="glass"
-            style={{ marginBottom: '25px', padding: '20px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--primary)', position: 'relative' }}
-          >
-            {/* Botão para fechar o monitor manualmente */}
-            {!isScraping && (
-              <button
-                onClick={() => setShowMonitor(false)}
-                style={{
-                  position: 'absolute',
-                  top: '15px',
-                  right: '15px',
-                  background: 'rgba(255,255,255,0.05)',
-                  color: 'white',
-                  border: 'none',
-                  cursor: 'pointer',
-                  width: '30px',
-                  height: '30px',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all 0.2s',
-                }}
-                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
-                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
-                title="Fechar Monitor"
-              >
-                <X size={18} />
-              </button>
-            )}
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                Monitor de Extração Live
-              </span>
-              <span style={{ fontSize: '0.9rem', color: 'white' }}>{liveStatus.progress}%</span>
-            </div>
-
-            {/* Botão de Cancelar (SÓ APARECE DURANTE SCRAPING) */}
-            {isScraping && (
-              <button
-                onClick={cancelScraper}
-                style={{
-                  position: 'absolute',
-                  top: '15px',
-                  right: '15px',
-                  background: 'rgba(244, 63, 94, 0.2)',
-                  color: '#f43f5e',
-                  border: '1px solid rgba(244, 63, 94, 0.4)',
-                  padding: '5px 12px',
-                  borderRadius: '8px',
-                  fontSize: '0.7rem',
-                  fontWeight: 800,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  cursor: 'pointer'
-                }}
-              >
-                <X size={14} />
-                PARAR AGORA
-              </button>
-            )}
-
-            <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '10px', overflow: 'hidden', marginBottom: '15px' }}>
-              <motion.div
-                style={{ height: '100%', background: 'linear-gradient(90deg, var(--primary), var(--accent))' }}
-                animate={{ width: `${liveStatus.progress}%` }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              {isScraping ? (
-                <div className="spin" style={{ width: '15px', height: '15px', border: '2px solid var(--primary)', borderTopColor: 'transparent', borderRadius: '50%' }} />
-              ) : (
-                <span style={{ fontSize: '1.2rem' }}>{liveStatus.progress === 100 ? '✅' : 'ℹ️'}</span>
-              )}
-              <span style={{
-                fontSize: '0.95rem',
-                color: liveStatus.progress === 100 ? '#10b981' : 'var(--text-main)',
-                fontWeight: liveStatus.progress === 100 ? 700 : 500
-              }}>
-                {liveStatus.progress === 100
-                  ? `FINALIZADO: ${liveStatus.links?.length || 0} imóveis extraídos com sucesso!`
-                  : liveStatus.message}
-              </span>
-            </div>
-
-            {liveStatus.currentItem && isScraping && (
-              <div style={{ marginTop: '10px', fontSize: '0.8rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '8px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px', borderLeft: '3px solid var(--primary)' }}>
-                PROCESSANDO: {liveStatus.currentItem}
-              </div>
-            )}
-
-            {liveStatus.links && liveStatus.links.length > 0 && (
-              <div style={{ marginTop: '15px' }}>
-                <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase' }}>
-                  Registros Encontrados ({liveStatus.links.length}):
-                </div>
-                <div style={{ maxHeight: '150px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  {liveStatus.links.map((link, idx) => (
-                    <div key={idx} className="glass" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', fontSize: '0.8rem', background: 'rgba(255,255,255,0.02)' }}>
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%', color: 'var(--text-main)' }}>
-                        {link}
-                      </span>
-                      <div style={{ display: 'flex', gap: '10px' }}>
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(link);
-                          }}
-                          style={{ background: 'transparent', padding: '0', color: 'var(--text-muted)' }}
-                          title="Copiar Link"
-                        >
-                          <Copy size={14} />
-                        </button>
-                        <a
-                          href={link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ color: 'var(--primary)', display: 'flex', alignItems: 'center' }}
-                          title="Abrir Anúncio"
-                        >
-                          <ExternalLink size={14} />
-                        </a>
-                      </div>
-                    </div>
-                  )).reverse()}
-                </div>
-              </div>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Container de Resultados - Estilo Dashboard */}
       <div className="glass" style={{ padding: '25px', borderRadius: '24px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.05)' }}>
