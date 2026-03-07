@@ -23,7 +23,9 @@ import {
   Smartphone,
   XCircle,
   FileText,
-  Activity
+  Activity,
+  Plus,
+  Trash
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import CalendarBox from 'react-calendar';
@@ -60,11 +62,8 @@ function App() {
   const [nextRun, setNextRun] = useState('');
   const [search, setSearch] = useState('');
   const [liveStatus, setLiveStatus] = useState({ message: 'Aguardando...', progress: 0, currentItem: null, links: [] });
-  const [showCalendar, setShowCalendar] = useState(false);
-  const [limit, setLimit] = useState(3);
-  const [limitEnabled, setLimitEnabled] = useState(false);
   const [scheduledTime, setScheduledTime] = useState('07:00');
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [schedules, setSchedules] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
   const [currentRequestId, setCurrentRequestId] = useState(null);
   const [subFilter, setSubFilter] = useState('all');
@@ -200,6 +199,7 @@ function App() {
         const data = docSnap.data();
         setScraperFilters(data);
         if (data.next_run) setNextRun(data.next_run);
+        if (data.schedules) setSchedules(data.schedules);
         if (data.limit_value) setLimit(data.limit_value);
         if (data.limit_enabled !== undefined) setLimitEnabled(data.limit_enabled);
       }
@@ -304,23 +304,26 @@ function App() {
     }
   };
 
-  const handleSaveSchedule = async () => {
-    const [hours, minutes] = scheduledTime.split(':');
-    const nextTime = DateTime.fromJSDate(selectedDate).set({
-      hour: parseInt(hours),
-      minute: parseInt(minutes)
-    }).toISO();
-
+  const addSchedule = async () => {
+    if (schedules.includes(scheduledTime)) return;
+    const newSchedules = [...schedules, scheduledTime].sort();
+    setSchedules(newSchedules);
     try {
       const docRef = doc(db, "system", "filters");
-      await setDoc(docRef, { next_run: nextTime }, { merge: true });
-
-      setNextRun(nextTime);
-      setShowCalendar(false);
-      alert("Agendamento salvo para: " + DateTime.fromISO(nextTime).toFormat('dd/MM HH:mm'));
+      await setDoc(docRef, { schedules: newSchedules }, { merge: true });
     } catch (e) {
-      console.error("Erro completo:", e);
-      alert("Erro ao atualizar agendamento: " + e.message);
+      console.error("Erro ao salvar:", e);
+    }
+  };
+
+  const removeSchedule = async (timeToRemove) => {
+    const newSchedules = schedules.filter(t => t !== timeToRemove);
+    setSchedules(newSchedules);
+    try {
+      const docRef = doc(db, "system", "filters");
+      await setDoc(docRef, { schedules: newSchedules }, { merge: true });
+    } catch (e) {
+      console.error("Erro ao remover:", e);
     }
   };
 
@@ -437,7 +440,11 @@ function App() {
                 <h1 className="logo-text">OpenHouses</h1>
                 <div className="agenda-badge" style={{ marginTop: '5px' }}>
                   <Clock size={12} />
-                  <span>AGENDADO: {nextRun ? DateTime.fromISO(nextRun).toFormat('dd/MM HH:mm') : 'Habilitar Robo'}</span>
+                  <span>
+                    {schedules.length > 0 ? (
+                      `DIÁRIO: ${schedules.length} horários`
+                    ) : 'Sem agendamento'}
+                  </span>
                 </div>
               </div>
 
@@ -493,7 +500,7 @@ function App() {
                   <div className="icon-circle"><Calendar size={18} /></div>
                   <div className="btn-label">
                     <span>Agenda</span>
-                    <small>{nextRun ? 'Robô Agendado' : 'Configurar Horário'}</small>
+                    <small>{schedules.length > 0 ? `${schedules.length} Horários` : 'Configurar Horário'}</small>
                   </div>
                 </button>
               </div>
@@ -728,49 +735,80 @@ function App() {
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             className="glass"
-            style={{ marginBottom: '25px', padding: '20px', overflow: 'hidden' }}
+            style={{ marginBottom: '25px', padding: '15px', overflow: 'hidden', maxWidth: '320px', margin: '0 auto 25px' }}
           >
-            <h4 style={{ marginBottom: '15px', fontWeight: 600 }}>Escolha a data e hora:</h4>
-            <div className="calendar-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
-              <CalendarBox
-                onChange={setSelectedDate}
-                value={selectedDate}
-                minDate={new Date()}
-                className="custom-calendar"
-              />
+            <div className="calendar-section" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginBottom: '10px' }}>
+                <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase' }}>Horários de Extração Diária</span>
+                <button onClick={() => setShowCalendar(false)} style={{ background: 'transparent', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}>
+                  <X size={14} />
+                </button>
+              </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '15px', width: '100%', justifyContent: 'center', background: 'rgba(0,0,0,0.2)', padding: '15px', borderRadius: '12px' }}>
-                <Clock size={20} color="var(--primary)" />
-                <span style={{ fontWeight: 600 }}>Horário:</span>
+              {/* Lista de Horários */}
+              <div style={{ width: '100%', display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+                {schedules && schedules.map(time => (
+                  <div key={time} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: 'rgba(99, 102, 241, 0.12)',
+                    padding: '6px 12px',
+                    borderRadius: '100px',
+                    border: '1px solid rgba(99, 102, 241, 0.2)',
+                    color: 'white',
+                    fontSize: '0.8rem',
+                    fontWeight: 700
+                  }}>
+                    <Clock size={12} />
+                    {time}
+                    <button onClick={() => removeSchedule(time)} style={{ background: 'transparent', display: 'flex', alignItems: 'center', color: '#f43f5e', padding: 0, marginLeft: '4px' }}>
+                      <XCircle size={14} />
+                    </button>
+                  </div>
+                ))}
+                {(!schedules || schedules.length === 0) && (
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', width: '100%', opacity: 0.6 }}>Nenhum horário diário configurado.</p>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', width: '100%', background: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: '12px', alignItems: 'center' }}>
                 <input
                   type="time"
                   value={scheduledTime}
                   onChange={(e) => setScheduledTime(e.target.value)}
-                  style={{
-                    background: 'var(--bg-dark)',
-                    border: '1px solid var(--primary)',
-                    color: 'white',
-                    padding: '8px',
-                    borderRadius: '8px',
-                    fontSize: '1.1rem'
-                  }}
+                  style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '0.95rem', fontWeight: 800, flex: 1, outline: 'none' }}
                 />
+                <button onClick={addSchedule} style={{ background: 'var(--primary)', color: 'white', padding: '8px 15px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800 }}>
+                  <Plus size={14} />
+                </button>
               </div>
 
+              <div style={{ width: '100%', height: '1px', background: 'rgba(255,255,255,0.05)' }} />
+
               <button
-                onClick={handleSaveSchedule}
+                onClick={() => {
+                  runScraper();
+                  setScheduledTime('');
+                  setShowCalendar(false);
+                }}
                 style={{
                   width: '100%',
-                  background: 'var(--primary)',
-                  color: 'white',
-                  padding: '12px',
+                  background: 'rgba(244, 63, 94, 0.1)',
+                  color: '#f43f5e',
+                  border: '1px solid rgba(244, 63, 94, 0.2)',
+                  padding: '10px',
                   borderRadius: '12px',
                   fontWeight: 800,
-                  fontSize: '1rem',
-                  boxShadow: '0 4px 15px rgba(99, 102, 241, 0.3)'
+                  fontSize: '0.8rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
                 }}
               >
-                SALVAR AGENDAMENTO
+                <Activity size={16} />
+                Extrair Agora
               </button>
             </div>
           </motion.div>
@@ -1098,9 +1136,9 @@ function TutorialStep({ step, onNext, onSkip }) {
       icon: <Star size={32} color="white" />
     },
     {
-      title: "📅 Agendamento",
-      content: "Use o calendário para definir quando o robô deve rodar automaticamente na sua base.",
-      icon: <Calendar size={32} color="white" />
+      title: "⏰ Agendamento Recorrente",
+      content: "Configure múltiplos horários para o robô rodar automaticamente todos os dias, mantendo sua base sempre atualizada.",
+      icon: <Clock size={32} color="white" />
     }
   ];
 
