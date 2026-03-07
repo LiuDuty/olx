@@ -20,7 +20,9 @@ import {
   Maximize,
   MapPin,
   X,
-  Smartphone
+  Smartphone,
+  XCircle,
+  FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import CalendarBox from 'react-calendar';
@@ -396,143 +398,106 @@ function App() {
 
       {!showSplash && !showTutorial && (
         <>
-          {/* Header */}
-          <header className="header glass-header">
-            <div className="header-info">
-              <h1 className="logo-text">
-                OpenHouses OLX
-              </h1>
-              <div className="agenda-badge">
-                <Calendar size={14} />
-                <span>AGENDADO: {nextRun ? DateTime.fromISO(nextRun).toFormat('dd/MM \'às\' HH:mm') : 'Não agendado'}</span>
+          {/* Header Minimalista */}
+          <header className="glass-header" style={{ marginBottom: '20px' }}>
+            <div className="logo-section">
+              <h1 className="logo-text">OpenHouses</h1>
+              <div className="agenda-badge" style={{ marginTop: '5px' }}>
+                <Clock size={12} />
+                <span>AGENDADO: {nextRun ? DateTime.fromISO(nextRun).toFormat('dd/MM HH:mm') : 'Habilitar Robo'}</span>
               </div>
             </div>
 
-            <div className="header-actions">
-              <div className="glass-button-group">
-                <button
-                  onClick={() => setShowFilters(!showFilters)}
-                  className="glass action-btn"
-                  style={{
-                    color: showFilters ? 'white' : 'var(--text-muted)',
-                    background: showFilters ? 'rgba(99,102,241,0.3)' : 'rgba(255,255,255,0.05)',
-                    border: showFilters ? '1px solid rgba(99,102,241,0.5)' : '1px solid rgba(255,255,255,0.08)',
-                  }}
-                >
-                  <Search size={14} />
-                  <span>FILTROS</span>
-                  {(scraperFilters.regions.length < 3 || scraperFilters.types.length < 2) && (
-                    <span className="filter-notification" />
-                  )}
-                </button>
+            <button
+              onClick={handleClearDatabase}
+              title="Apagar Toda a Base"
+              className="action-btn"
+              style={{
+                background: 'rgba(244, 63, 94, 0.05)',
+                border: '1px solid rgba(244, 63, 94, 0.15)',
+                color: 'var(--accent)',
+                padding: '10px',
+                borderRadius: '12px'
+              }}
+            >
+              <Trash2 size={18} />
+            </button>
+          </header>
 
-                <button
-                  onClick={() => setShowCalendar(!showCalendar)}
-                  className="glass action-btn icon-only"
-                  style={{
-                    color: 'white',
-                    background: showCalendar ? 'var(--primary)' : 'rgba(255,255,255,0.05)'
-                  }}
-                >
-                  <Calendar size={18} />
-                </button>
+          {/* NOVO: Dashboard de Controle Moderno */}
+          <div className="dashboard-grid glass" style={{ marginBottom: '25px', padding: '15px' }}>
+            <div className="dashboard-item">
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`control-btn ${showFilters ? 'active' : ''}`}
+              >
+                <div className="icon-circle"><Search size={18} /></div>
+                <div className="btn-label">
+                  <span>Busca</span>
+                  <small>{scraperFilters.regions.length} Regiões • {scraperFilters.types.length} Tipos</small>
+                </div>
+                <ChevronRight size={16} style={{
+                  transform: showFilters ? 'rotate(90deg)' : 'none',
+                  transition: '0.3s',
+                  color: showFilters ? 'white' : 'var(--text-muted)'
+                }} />
+              </button>
+            </div>
+
+            <div className="dashboard-item">
+              <button
+                onClick={() => setShowCalendar(!showCalendar)}
+                className={`control-btn ${showCalendar ? 'active' : ''}`}
+              >
+                <div className="icon-circle"><Calendar size={18} /></div>
+                <div className="btn-label">
+                  <span>Agenda</span>
+                  <small>{nextRun ? 'Robô Agendado' : 'Configurar Horário'}</small>
+                </div>
+              </button>
+            </div>
+
+            <div className="dashboard-item limit-panel">
+              <div className="control-btn no-pointer">
+                <div className="icon-circle" onClick={() => {
+                  const newState = !limitEnabled;
+                  setLimitEnabled(newState);
+                  saveConfig('limit_enabled', newState);
+                }} style={{ background: limitEnabled ? 'var(--primary)' : 'rgba(255,255,255,0.08)', cursor: 'pointer' }}>
+                  <Smartphone size={18} style={{ color: 'white' }} />
+                </div>
+                <div className="btn-label">
+                  <span>Limite</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <input
+                      type="number"
+                      value={limit}
+                      disabled={!limitEnabled}
+                      onChange={(e) => {
+                        setLimit(e.target.value);
+                        saveConfig('limit_value', e.target.value);
+                      }}
+                      className="inline-input"
+                    />
+                    <small>anúncios</small>
+                  </div>
+                </div>
               </div>
+            </div>
 
-              <div className="glass" style={{ display: 'flex', alignItems: 'center', padding: '5px 12px', gap: '8px' }}>
-                <input
-                  type="checkbox"
-                  checked={limitEnabled}
-                  onChange={() => {
-                    const newState = !limitEnabled;
-                    setLimitEnabled(newState);
-                    saveConfig('limit_enabled', newState);
-                  }}
-                  style={{
-                    cursor: 'pointer',
-                    width: '18px',
-                    height: '18px',
-                    accentColor: 'var(--primary)'
-                  }}
-                />
-
-                <span
-                  onClick={() => {
-                    const newState = !limitEnabled;
-                    setLimitEnabled(newState);
-                    saveConfig('limit_enabled', newState);
-                  }}
-                  style={{
-                    fontSize: '0.7rem',
-                    color: limitEnabled ? 'white' : 'var(--text-muted)',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    userSelect: 'none'
-                  }}
-                >
-                  LIMITE (MAX):
-                </span>
-                <input
-                  type="number"
-                  value={limit}
-                  disabled={!limitEnabled}
-                  onChange={(e) => {
-                    setLimit(e.target.value);
-                    saveConfig('limit_value', e.target.value);
-                  }}
-                  style={{
-                    width: '35px',
-                    background: 'transparent',
-                    border: 'none',
-                    textAlign: 'center',
-                    padding: '5px 0',
-                    fontSize: '0.9rem',
-                    opacity: limitEnabled ? 1 : 0.3,
-                    color: 'white',
-                    outline: 'none',
-                    borderBottom: limitEnabled ? '1px solid rgba(255,255,255,0.2)' : 'none'
-                  }}
-                  min="1"
-                  max="500"
-                />
-              </div>
-
+            <div className="dashboard-item extract-action">
               <button
                 onClick={runScraper}
                 disabled={isScraping}
-                style={{
-                  background: 'var(--primary)',
-                  color: 'white',
-                  padding: '10px 20px',
-                  borderRadius: '12px',
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  boxShadow: '0 4px 15px rgba(99, 102, 241, 0.4)'
-                }}
+                className="extract-btn"
               >
-                <RefreshCw size={18} className={isScraping ? 'spin' : ''} />
-                {isScraping ? 'Rodando...' : 'Extrair Agora'}
-              </button>
-
-              <button
-                onClick={handleClearDatabase}
-                title="Apagar Toda a Base"
-                style={{
-                  background: 'rgba(244, 63, 94, 0.1)',
-                  border: '1px solid rgba(244, 63, 94, 0.2)',
-                  color: 'var(--accent)',
-                  padding: '10px',
-                  borderRadius: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-              >
-                <Trash2 size={18} />
+                <div className={`extract-icon ${isScraping ? 'spin' : ''}`}>
+                  <RefreshCw size={20} />
+                </div>
+                <span>{isScraping ? 'Extraindo...' : 'Extrair Agora'}</span>
               </button>
             </div>
-          </header>
+          </div>
 
           {/* Painel de Filtros do Scraper */}
           <AnimatePresence>
@@ -830,52 +795,82 @@ function App() {
             )}
           </AnimatePresence>
 
-          <div className="search-tabs-container">
-            <div className="search-bar glass">
-              <Search className="search-icon" size={18} />
-              <input
-                type="text"
-                placeholder="Pesquisar..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+          {/* Container de Resultados - Estilo Dashboard */}
+          <div className="glass" style={{ padding: '25px', borderRadius: '24px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }}>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'white', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '8px', height: '18px', background: 'var(--primary)', borderRadius: '4px' }} />
+                Descobertas Recentes
+              </h2>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.05)', padding: '6px 12px', borderRadius: '20px', fontWeight: 700, border: '1px solid rgba(255,255,255,0.05)' }}>
+                {filteredListings.length} REGISTROS
+              </div>
             </div>
 
-            <div className="glass tabs-nav">
-              {[
-                { id: 'active', label: 'Todos' },
-                { id: 'vendas', label: 'Vendas' },
-                { id: 'aluguel', label: 'Aluguel' },
-                { id: 'favorites', label: 'Favoritos' },
-                { id: 'ignored', label: 'Trabalhados' }
-              ].map(t => (
-                <button
-                  key={t.id}
-                  onClick={() => setFilter(t.id)}
-                  className={filter === t.id ? 'active' : ''}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-          </div>
+            <div className="search-tabs-container" style={{ margin: '0 0 25px 0' }}>
+              <div className="search-bar">
+                <Search className="search-icon" size={18} />
+                <input
+                  type="text"
+                  placeholder="Preço, bairro, notas ou link..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+                {search && (
+                  <button onClick={() => setSearch('')} style={{ background: 'transparent', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', border: 'none' }}>
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
 
-          {/* Listings */}
-          <div style={{ display: 'grid', gap: '20px' }}>
-            {loading ? (
-              <div style={{ textAlign: 'center', padding: '50px', color: 'var(--text-muted)' }}>Carrregando imóveis...</div>
-            ) : filteredListings.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '50px', color: 'var(--text-muted)' }}>Nenhum item encontrado.</div>
-            ) : (
-              <AnimatePresence>
-                {filteredListings.map((l) => (
-                  <ListingCard
-                    key={l.id}
-                    listing={l}
-                    onUpdate={handleUpdateListing}
-                  />
+              <div className="tabs-nav">
+                {[
+                  { id: 'active', label: 'Todos', icon: <Layout size={14} /> },
+                  { id: 'vendas', label: 'Vendas', icon: <Home size={14} /> },
+                  { id: 'aluguel', label: 'Aluguel', icon: <RefreshCw size={14} /> },
+                  { id: 'favorites', label: 'Favoritos', icon: <Star size={14} /> },
+                  { id: 'ignored', label: 'Trabalhados', icon: <Archive size={14} /> }
+                ].map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => setFilter(t.id)}
+                    className={filter === t.id ? 'active' : ''}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                  >
+                    {t.icon}
+                    <span>{t.label}</span>
+                  </button>
                 ))}
-              </AnimatePresence>
+              </div>
+            </div>
+
+            {loading ? (
+              <div style={{ padding: '80px 20px', textAlign: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '20px', border: '1px dashed rgba(255,255,255,0.1)' }}>
+                <RefreshCw size={40} className="spin" style={{ color: 'var(--primary)', marginBottom: '20px', opacity: 0.5 }} />
+                <p style={{ fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.5px' }}>SINCRONIZANDO COM A BASE...</p>
+              </div>
+            ) : filteredListings.length === 0 ? (
+              <div style={{ padding: '100px 20px', textAlign: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '20px', border: '1px dashed rgba(255,255,255,0.1)' }}>
+                <div style={{ width: '60px', height: '60px', background: 'rgba(255,255,255,0.03)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+                  <Search size={24} style={{ color: 'var(--text-muted)', opacity: 0.4 }} />
+                </div>
+                <h3 style={{ fontSize: '1.1rem', marginBottom: '8px', color: 'white' }}>Nenhum anúncio encontrado</h3>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', maxWidth: '280px', margin: '0 auto' }}>
+                  Tente remover os termos de busca ou mudar a aba de filtros.
+                </p>
+              </div>
+            ) : (
+              <div className="listings-grid">
+                <AnimatePresence mode="popLayout">
+                  {filteredListings.map((l) => (
+                    <ListingCard
+                      key={l.id}
+                      listing={l}
+                      onUpdate={handleUpdateListing}
+                    />
+                  ))}
+                </AnimatePresence>
+              </div>
             )}
           </div>
         </>
@@ -1007,157 +1002,238 @@ function ListingCard({ listing, onUpdate }) {
   const [showNote, setShowNote] = useState(false);
 
   const price = listing.get("price");
-  const phone = listing.get("phone");
-  const contactName = listing.get("contactName");
   const isIgnored = listing.get("status") === 'ignored';
+  const capDate = listing.get("capturedAt") || listing.get("lastUpdated");
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
+      layout
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      whileHover={{ y: -4, borderColor: 'rgba(99, 102, 241, 0.4)' }}
       exit={{ opacity: 0, scale: 0.95 }}
       className={`glass listing-card ${isIgnored ? 'ignored' : ''} ${listing.get("isFavorite") ? 'favorite' : ''}`}
+      style={{ padding: '12px', gap: '10px', display: 'flex', flexDirection: 'column' }}
     >
-      {/* Container Esquerdo: Preço e Título */}
-      <div className="listing-info">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%', marginBottom: '5px' }}>
-          <div className="listing-card-price">
-            {price && price !== 'N/A' ? price : 'Consulte'}
-          </div>
-
-          <div style={{ display: 'flex', gap: '6px' }}>
-            {/* Tags removidas por solicitação */}
-          </div>
-        </div>
-
-        {listing.get("title") && (
-          <div className="listing-title" style={{ fontSize: '1rem', marginBottom: '12px' }}>
-            {listing.get("title")}
-          </div>
-        )}
-
-        <div className="listing-details-row">
-          {/* Fone removido daqui por solicitação do usuário */}
-
-          {/* Badges de Detalhes (Oculta N/D) */}
-          <div className="listing-meta" style={{ background: 'rgba(255,255,255,0.05)', padding: '4px 12px', borderRadius: '10px', display: 'flex', gap: '15px' }}>
-            {listing.get("rooms") && listing.get("rooms") !== 'N/D' && (
-              <span title="Quartos" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem' }}>
-                <Home size={14} /> {String(listing.get("rooms")).replace(/\D/g, '')}
-              </span>
-            )}
-            {listing.get("area") && listing.get("area") !== 'N/D' && (
-              <span title="Área" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem' }}>
-                <Maximize size={14} /> {listing.get("area")}
-              </span>
-            )}
-            {listing.get("garage") && listing.get("garage") !== 'N/D' && (
-              <span title="Vagas" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem' }}>
-                <Layout size={14} /> {String(listing.get("garage")).replace(/\D/g, '')}
-              </span>
-            )}
-            {listing.get("bathrooms") && listing.get("bathrooms") !== 'N/D' && (
-              <span title="Banheiros" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem' }}>
-                <Droplets size={14} /> {String(listing.get("bathrooms")).replace(/\D/g, '')}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Localização, Contato e Data */}
-        <div className="listing-location-row">
-          {listing.get("location") &&
-            listing.get("location") !== 'N/D' &&
-            listing.get("location") !== 'Alphaville/Tamboré' && (
-              <span style={{ color: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <MapPin size={12} /> {String(listing.get("location")).split(',').slice(0, 2).join(',')}
-              </span>
-            )}
-
-          <span style={{ color: 'rgba(255,255,255,0.2)', fontWeight: 500 }}>
-            {(() => {
-              const capDate = listing.get("capturedAt") || listing.get("lastUpdated");
-              if (!capDate) return '-';
-              let dt;
-              if (capDate && typeof capDate.toDate === 'function') dt = DateTime.fromJSDate(capDate.toDate());
-              else if (typeof capDate === 'string') dt = DateTime.fromISO(capDate);
-              else if (capDate && capDate.iso) dt = DateTime.fromISO(capDate.iso);
-              else dt = DateTime.fromJSDate(new Date(capDate));
-              return dt.isValid ? dt.toFormat('dd/MM/yyyy HH:mm') : '-';
-            })()}
-          </span>
-
-          {(contactName && contactName !== 'Desconhecido') && (
-            <span style={{ color: 'var(--primary)', fontWeight: 600, opacity: 0.6 }}>
-              • {contactName}
-            </span>
+      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+        {/* Compact Thumbnail on Left */}
+        <div style={{
+          width: '90px',
+          height: '90px',
+          background: 'rgba(255, 255, 255, 0.04)',
+          borderRadius: '10px',
+          overflow: 'hidden',
+          flexShrink: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          border: '1px solid rgba(255,255,255,0.05)'
+        }}>
+          {listing.get("thumbnail") ? (
+            <img src={listing.get("thumbnail")} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : (
+            <Home size={28} style={{ color: 'rgba(255,255,255,0.08)' }} />
           )}
         </div>
+
+        {/* Compact Info on Right */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div className="listing-card-price" style={{ fontSize: '1.05rem', fontWeight: 900, color: '#10b981', margin: 0 }}>
+              {price && price !== 'N/A' ? price : 'Consulte'}
+            </div>
+            {listing.get("isFavorite") && <Star size={14} fill="#f59e0b" style={{ color: '#f59e0b' }} />}
+          </div>
+
+          <div className="listing-title" style={{
+            fontSize: '0.82rem',
+            margin: 0,
+            lineHeight: '1.3',
+            maxHeight: '2.6em',
+            overflow: 'hidden',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            color: 'rgba(255,255,255,0.9)'
+          }}>
+            {listing.get("title")}
+          </div>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '2px' }}>
+            {listing.get("rooms") && listing.get("rooms") !== 'N/D' && (
+              <div className="badge" style={{ padding: '1px 6px', fontSize: '0.65rem', borderRadius: '4px' }}>
+                {String(listing.get("rooms")).replace(/\D/g, '')}Q
+              </div>
+            )}
+            {listing.get("area") && listing.get("area") !== 'N/D' && (
+              <div className="badge" style={{ padding: '1px 6px', fontSize: '0.65rem', borderRadius: '4px' }}>
+                {listing.get("area")}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* Ações */}
-      <div className="listing-card-actions">
-        <a
-          href={listing.get("link")}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ color: 'var(--text-muted)', padding: '8px' }}
-        >
-          <ExternalLink size={18} />
-        </a>
+      {/* Compact Actions Bar */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: '2px',
+        paddingTop: '8px',
+        borderTop: '1px solid rgba(255,255,255,0.05)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'rgba(255,255,255,0.5)', fontSize: '0.65rem' }}>
+          <MapPin size={10} style={{ color: 'var(--primary)' }} />
+          <span style={{ maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(255,255,255,0.8)' }}>
+            {String(listing.get("location") || 'Alphaville').split(',')[0]}
+          </span>
+          <span style={{ opacity: 0.3 }}>•</span>
+          <span style={{ color: 'rgba(255,255,255,0.6)' }}>
+            {(() => {
+              if (!capDate) return '';
+              const dt = capDate.toDate ? DateTime.fromJSDate(capDate.toDate()) : DateTime.fromJSDate(new Date(capDate));
+              return dt.isValid ? dt.toFormat('dd/MM HH:mm') : '';
+            })()}
+          </span>
+        </div>
 
-        <button
-          onClick={() => setShowNote(!showNote)}
-          style={{ color: showNote ? 'var(--primary)' : 'var(--text-muted)' }}
-        >
-          <MessageSquare size={18} />
-        </button>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <button
+            onClick={() => onUpdate(listing, { isFavorite: !listing.get("isFavorite") })}
+            style={{
+              color: listing.get("isFavorite") ? '#f59e0b' : 'rgba(255,255,255,0.6)',
+              background: listing.get("isFavorite") ? 'rgba(245, 158, 11, 0.1)' : 'rgba(255,255,255,0.03)',
+              border: `1px solid ${listing.get("isFavorite") ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255,255,255,0.06)'}`,
+              padding: '6px',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.background = listing.get("isFavorite") ? 'rgba(245, 158, 11, 0.1)' : 'rgba(255,255,255,0.03)';
+            }}
+          >
+            <Star size={15} fill={listing.get("isFavorite") ? "#f59e0b" : "none"} />
+          </button>
 
-        <button
-          onClick={() => onUpdate(listing, { isFavorite: !listing.get("isFavorite") })}
-          style={{ color: listing.get("isFavorite") ? '#f59e0b' : 'var(--text-muted)' }}
-        >
-          <Star fill={listing.get("isFavorite") ? "#f59e0b" : "none"} size={20} />
-        </button>
+          <button
+            onClick={() => onUpdate(listing, { status: isIgnored ? 'active' : 'ignored' })}
+            style={{
+              color: isIgnored ? '#f43f5e' : 'rgba(255,255,255,0.6)',
+              background: isIgnored ? 'rgba(244, 63, 94, 0.1)' : 'rgba(255,255,255,0.03)',
+              border: `1px solid ${isIgnored ? 'rgba(244, 63, 94, 0.2)' : 'rgba(255,255,255,0.06)'}`,
+              padding: '6px',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.background = isIgnored ? 'rgba(244, 63, 94, 0.1)' : 'rgba(255,255,255,0.03)';
+            }}
+          >
+            {isIgnored ? <RefreshCw size={15} /> : <XCircle size={15} />}
+          </button>
 
-        <button
-          onClick={() => onUpdate(listing, { status: isIgnored ? 'active' : 'ignored' })}
-          style={{ color: isIgnored ? 'var(--accent)' : 'var(--text-muted)' }}
-        >
-          {isIgnored ? <RefreshCw size={18} /> : <Archive size={18} />}
-        </button>
+          <button
+            onClick={() => setShowNote(!showNote)}
+            style={{
+              color: note ? 'var(--primary)' : 'rgba(255,255,255,0.6)',
+              background: note ? 'rgba(99, 102, 241, 0.1)' : 'rgba(255,255,255,0.03)',
+              border: `1px solid ${note ? 'rgba(99, 102, 241, 0.2)' : 'rgba(255,255,255,0.06)'}`,
+              padding: '6px',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.background = note ? 'rgba(99, 102, 241, 0.1)' : 'rgba(255,255,255,0.03)';
+            }}
+          >
+            <FileText size={15} />
+          </button>
+
+          <a
+            href={listing.get("link")}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              color: 'var(--primary)',
+              background: 'rgba(99, 102, 241, 0.1)',
+              border: '1px solid rgba(99, 102, 241, 0.2)',
+              padding: '6px',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px) scale(1.05)';
+              e.currentTarget.style.background = 'rgba(99, 102, 241, 0.2)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0) scale(1)';
+              e.currentTarget.style.background = 'rgba(99, 102, 241, 0.1)';
+            }}
+          >
+            <ExternalLink size={15} />
+          </a>
+        </div>
       </div>
 
-      {/* Área de Notas Expansível */}
+      {/* Ultra Compact Note Tooltip/Overlay */}
       <AnimatePresence>
         {showNote && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            style={{
-              position: 'absolute',
-              right: '25px', top: '70px',
-              zIndex: 10, background: 'var(--bg-dark)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              padding: '12px', borderRadius: '14px',
-              boxShadow: '0 10px 30px rgba(0,0,0,0.6)',
-              display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '200px'
-            }}
+            style={{ overflow: 'hidden', width: '100%' }}
           >
             <textarea
-              rows="3"
-              placeholder="Notas..."
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              style={{ fontSize: '0.85rem' }}
+              placeholder="Nota..."
+              rows={2}
+              style={{ padding: '6px', fontSize: '0.75rem', width: '100%', marginTop: '5px', background: 'rgba(0,0,0,0.2)' }}
             />
             <button
               onClick={() => {
                 onUpdate(listing, { notes: note });
                 setShowNote(false);
               }}
-              style={{ background: 'var(--primary)', color: 'white', padding: '8px', borderRadius: '8px', fontWeight: 700 }}
+              style={{
+                width: '100%',
+                marginTop: '4px',
+                background: 'var(--primary)',
+                color: 'white',
+                padding: '5px',
+                borderRadius: '6px',
+                fontWeight: 'bold',
+                fontSize: '0.7rem'
+              }}
             >
               SALVAR NOTA
             </button>
