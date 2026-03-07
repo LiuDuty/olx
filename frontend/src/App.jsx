@@ -28,8 +28,6 @@ import {
   Trash
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import CalendarBox from 'react-calendar';
-import 'react-calendar/dist/Calendar.css';
 
 // Import Firebase
 import { db } from './firebase_config';
@@ -64,6 +62,9 @@ function App() {
   const [liveStatus, setLiveStatus] = useState({ message: 'Aguardando...', progress: 0, currentItem: null, links: [] });
   const [scheduledTime, setScheduledTime] = useState('07:00');
   const [schedules, setSchedules] = useState([]);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [limit, setLimit] = useState(3);
+  const [limitEnabled, setLimitEnabled] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [currentRequestId, setCurrentRequestId] = useState(null);
   const [subFilter, setSubFilter] = useState('all');
