@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { DateTime } from 'luxon';
 import {
   Star,
@@ -22,7 +22,8 @@ import {
   X,
   Smartphone,
   XCircle,
-  FileText
+  FileText,
+  Activity
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import CalendarBox from 'react-calendar';
@@ -66,6 +67,7 @@ function App() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showFilters, setShowFilters] = useState(false);
   const [currentRequestId, setCurrentRequestId] = useState(null);
+  const [subFilter, setSubFilter] = useState('all');
   const [scraperFilters, setScraperFilters] = useState({
     regions: ['alphaville', 'tambore', 'barueri'],
     types: ['venda'],
@@ -95,17 +97,15 @@ function App() {
     if (!showSplash && !showTutorial) {
       fetchConfig();
       fetchStatus();
-      fetchListings(); // <--- CHAMADA IMEDIATA PARA NÃO FICAR PRESO NO LOADING
+      fetchListings(); // Chamada inicial ou quando o filtro muda
 
-      // Intervalo mais rápido se estiver extraindo (2s), senão 15s
-      const intervalTime = isScraping ? 2000 : 15000;
       const interval = setInterval(() => {
-        fetchListings();
+        fetchListings(true); // Chamada silenciosa para o background
         fetchStatus();
-      }, intervalTime);
+      }, isScraping ? 2500 : 15000);
       return () => clearInterval(interval);
     }
-  }, [filter, showSplash, showTutorial, isScraping]);
+  }, [showSplash, showTutorial, filter, isScraping]);
 
   const fetchStatus = async () => {
     try {
@@ -127,21 +127,16 @@ function App() {
 
         if (data.progress > 0 && data.progress < 100) {
           setIsScraping(true);
-          setShowMonitor(true);
         } else if (data.progress === 100) {
           setIsScraping(false);
-          if (data.links?.length > 0) setShowMonitor(true);
         } else if (isError) {
           setIsScraping(false);
-          setShowMonitor(true);
         } else if (data.progress === 0) {
           const isStarting = msg.includes('iniciando') || msg.includes('verificando') || msg.includes('conectando');
           if (isStarting) {
             setIsScraping(true);
-            setShowMonitor(true);
           } else {
             setIsScraping(false);
-            if (data.links?.length > 0) setShowMonitor(true);
           }
         }
       }
@@ -150,9 +145,9 @@ function App() {
     }
   };
 
-  const fetchListings = async () => {
+  const fetchListings = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       console.log("⚡ [Firebase] Iniciando busca de anúncios...");
       const listingsRef = collection(db, "listings");
       // Buscamos os itens sem filtros complexos para evitar erro de índice no Firestore
@@ -355,14 +350,37 @@ function App() {
     }
   };
 
+  const getPropertyType = (l) => {
+    const t = String(l.get("title") || "").toLowerCase();
+    if (t.includes("casa") || t.includes("sobrado") || t.includes("mansão")) return "Casa";
+    if (t.includes("apartamento") || t.includes("apto") || t.includes("flat") || t.includes("studio")) return "Apartamento";
+    if (t.includes("terreno") || t.includes("lote")) return "Terreno";
+    if (t.includes("comercial") || t.includes("sala") || t.includes("escritório") || t.includes("loja")) return "Comercial";
+    if (t.includes("chácara") || t.includes("sítio") || t.includes("fazenda")) return "Rural";
+    return "Outros";
+  };
+
   const filteredListings = listings
     .filter(l => {
       if (!l) return false;
+
+      // Filtro de Texto (Busca)
       const s = String(search || "").toLowerCase();
       const p = String(l.get("price") || "").toLowerCase();
       const lnk = String(l.get("link") || "").toLowerCase();
       const n = String(l.get("notes") || "").toLowerCase();
-      return p.includes(s) || lnk.includes(s) || n.includes(s);
+      const t = String(l.get("title") || "").toLowerCase();
+      const matchesSearch = p.includes(s) || lnk.includes(s) || n.includes(s) || t.includes(s);
+
+      if (!matchesSearch) return false;
+
+      // Filtro de Categoria (Sub-filtro)
+      if (subFilter !== 'all' && (filter === 'vendas' || filter === 'aluguel')) {
+        const type = getPropertyType(l);
+        if (type !== subFilter) return false;
+      }
+
+      return true;
     })
     .sort((a, b) => {
       const getVal = (obj) => {
@@ -371,6 +389,20 @@ function App() {
       };
       return getVal(b) - getVal(a);
     });
+
+  const availableSubFilters = useMemo(() => {
+    if (filter !== 'all' && filter !== 'vendas' && filter !== 'aluguel') return [];
+
+    const types = new Set();
+    listings.forEach(l => {
+      // Se for 'all', mostramos tipos de tudo. Se for vendas/aluguel, só daquela categoria.
+      if (filter === 'all' || l.get("listingType") === (filter === 'vendas' ? 'venda' : 'aluguel')) {
+        types.add(getPropertyType(l));
+      }
+    });
+    const sortedTypes = Array.from(types).sort();
+    return sortedTypes.length > 0 ? ['all', ...sortedTypes] : [];
+  }, [listings, filter]);
 
   return (
     <div className="container">
@@ -398,417 +430,125 @@ function App() {
 
       {!showSplash && !showTutorial && (
         <>
-          {/* Header Minimalista */}
-          <header className="glass-header" style={{ marginBottom: '20px' }}>
-            <div className="logo-section">
-              <h1 className="logo-text">OpenHouses</h1>
-              <div className="agenda-badge" style={{ marginTop: '5px' }}>
-                <Clock size={12} />
-                <span>AGENDADO: {nextRun ? DateTime.fromISO(nextRun).toFormat('dd/MM HH:mm') : 'Habilitar Robo'}</span>
-              </div>
-            </div>
-
-            <button
-              onClick={handleClearDatabase}
-              title="Apagar Toda a Base"
-              className="action-btn"
-              style={{
-                background: 'rgba(244, 63, 94, 0.05)',
-                border: '1px solid rgba(244, 63, 94, 0.15)',
-                color: 'var(--accent)',
-                padding: '10px',
-                borderRadius: '12px'
-              }}
-            >
-              <Trash2 size={18} />
-            </button>
-          </header>
-
-          {/* NOVO: Dashboard de Controle Moderno */}
-          <div className="dashboard-grid glass" style={{ marginBottom: '25px', padding: '15px' }}>
-            <div className="dashboard-item">
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className={`control-btn ${showFilters ? 'active' : ''}`}
-              >
-                <div className="icon-circle"><Search size={18} /></div>
-                <div className="btn-label">
-                  <span>Busca</span>
-                  <small>{scraperFilters.regions.length} Regiões • {scraperFilters.types.length} Tipos</small>
-                </div>
-                <ChevronRight size={16} style={{
-                  transform: showFilters ? 'rotate(90deg)' : 'none',
-                  transition: '0.3s',
-                  color: showFilters ? 'white' : 'var(--text-muted)'
-                }} />
-              </button>
-            </div>
-
-            <div className="dashboard-item">
-              <button
-                onClick={() => setShowCalendar(!showCalendar)}
-                className={`control-btn ${showCalendar ? 'active' : ''}`}
-              >
-                <div className="icon-circle"><Calendar size={18} /></div>
-                <div className="btn-label">
-                  <span>Agenda</span>
-                  <small>{nextRun ? 'Robô Agendado' : 'Configurar Horário'}</small>
-                </div>
-              </button>
-            </div>
-
-            <div className="dashboard-item limit-panel">
-              <div className="control-btn no-pointer">
-                <div className="icon-circle" onClick={() => {
-                  const newState = !limitEnabled;
-                  setLimitEnabled(newState);
-                  saveConfig('limit_enabled', newState);
-                }} style={{ background: limitEnabled ? 'var(--primary)' : 'rgba(255,255,255,0.08)', cursor: 'pointer' }}>
-                  <Smartphone size={18} style={{ color: 'white' }} />
-                </div>
-                <div className="btn-label">
-                  <span>Limite</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <input
-                      type="number"
-                      value={limit}
-                      disabled={!limitEnabled}
-                      onChange={(e) => {
-                        setLimit(e.target.value);
-                        saveConfig('limit_value', e.target.value);
-                      }}
-                      className="inline-input"
-                    />
-                    <small>anúncios</small>
-                  </div>
+          {/* Header e Dashboard Fixos */}
+          <div className="sticky-controls">
+            <header className="glass-header" style={{ marginBottom: '15px' }}>
+              <div className="logo-section">
+                <h1 className="logo-text">OpenHouses</h1>
+                <div className="agenda-badge" style={{ marginTop: '5px' }}>
+                  <Clock size={12} />
+                  <span>AGENDADO: {nextRun ? DateTime.fromISO(nextRun).toFormat('dd/MM HH:mm') : 'Habilitar Robo'}</span>
                 </div>
               </div>
-            </div>
 
-            <div className="dashboard-item extract-action">
               <button
-                onClick={runScraper}
-                disabled={isScraping}
-                className="extract-btn"
+                onClick={handleClearDatabase}
+                title="Apagar Toda a Base"
+                className="action-btn"
+                style={{
+                  background: 'rgba(244, 63, 94, 0.05)',
+                  border: '1px solid rgba(244, 63, 94, 0.15)',
+                  color: 'var(--accent)',
+                  padding: '10px',
+                  borderRadius: '12px'
+                }}
               >
-                <div className={`extract-icon ${isScraping ? 'spin' : ''}`}>
-                  <RefreshCw size={20} />
-                </div>
-                <span>{isScraping ? 'Extraindo...' : 'Extrair Agora'}</span>
+                <Trash2 size={18} />
               </button>
-            </div>
-          </div>
+            </header>
 
-          {/* Painel de Filtros do Scraper */}
-          <AnimatePresence>
-            {showFilters && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="glass"
-                style={{ marginBottom: '25px', padding: '20px', overflow: 'hidden', border: '1px solid rgba(99,102,241,0.2)' }}
-              >
-                <h4 style={{ marginBottom: '16px', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '1px', textTransform: 'uppercase', color: 'var(--primary)' }}>
-                  ⚙️ Configuração da Busca
-                </h4>
-
-                <div className="filters-grid">
-                  {/* Regiões */}
-                  <div>
-                    <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>📍 Regiões</p>
-                    {[{ id: 'alphaville', label: 'Alphaville', color: '#6366f1' }, { id: 'tambore', label: 'Tamboré', color: '#f59e0b' }, { id: 'barueri', label: 'Barueri', color: '#10b981' }].map(r => (
-                      <label key={r.id} onClick={() => toggleRegion(r.id)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', marginBottom: '6px', borderRadius: '8px', cursor: 'pointer', background: scraperFilters.regions.includes(r.id) ? `${r.color}22` : 'rgba(255,255,255,0.03)', border: `1px solid ${scraperFilters.regions.includes(r.id) ? r.color + '55' : 'rgba(255,255,255,0.08)'}`, transition: 'all 0.2s' }}>
-                        <span style={{ width: '18px', height: '18px', borderRadius: '5px', background: scraperFilters.regions.includes(r.id) ? r.color : 'transparent', border: `2px solid ${scraperFilters.regions.includes(r.id) ? r.color : 'rgba(255,255,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', transition: 'all 0.2s' }}>
-                          {scraperFilters.regions.includes(r.id) ? '✓' : ''}
-                        </span>
-                        <span style={{ fontWeight: 600, fontSize: '0.9rem', color: scraperFilters.regions.includes(r.id) ? 'white' : 'var(--text-muted)' }}>{r.label}</span>
-                      </label>
-                    ))}
+            {/* DASHBOARD DE CONTROLE */}
+            <div className="dashboard-grid glass" style={{ marginBottom: '15px', padding: '10px' }}>
+              <div className="dashboard-item">
+                <button
+                  onClick={() => {
+                    setShowFilters(!showFilters);
+                    setShowCalendar(false);
+                    setShowMonitor(false);
+                  }}
+                  className={`control-btn ${showFilters ? 'active' : ''}`}
+                >
+                  <div className="icon-circle"><Search size={18} /></div>
+                  <div className="btn-label">
+                    <span>Busca</span>
+                    <small>{scraperFilters.regions.length} Regiões • {scraperFilters.types.length} Tipos</small>
                   </div>
+                  <ChevronRight size={16} style={{
+                    transform: showFilters ? 'rotate(90deg)' : 'none',
+                    transition: '0.3s',
+                    color: showFilters ? 'white' : 'var(--text-muted)'
+                  }} />
+                </button>
+              </div>
 
-                  {/* Tipo + Preço */}
-                  <div>
-                    <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🏠 Tipo de Negócio</p>
-                    {[{ id: 'venda', label: 'Venda', color: '#6366f1' }, { id: 'aluguel', label: 'Aluguel', color: '#f43f5e' }].map(t => (
-                      <label key={t.id} onClick={() => toggleType(t.id)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', marginBottom: '6px', borderRadius: '8px', cursor: 'pointer', background: scraperFilters.types.includes(t.id) ? `${t.color}22` : 'rgba(255,255,255,0.03)', border: `1px solid ${scraperFilters.types.includes(t.id) ? t.color + '55' : 'rgba(255,255,255,0.08)'}`, transition: 'all 0.2s' }}>
-                        <span style={{ width: '18px', height: '18px', borderRadius: '5px', background: scraperFilters.types.includes(t.id) ? t.color : 'transparent', border: `2px solid ${scraperFilters.types.includes(t.id) ? t.color : 'rgba(255,255,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', transition: 'all 0.2s' }}>
-                          {scraperFilters.types.includes(t.id) ? '✓' : ''}
-                        </span>
-                        <span style={{ fontWeight: 600, fontSize: '0.9rem', color: scraperFilters.types.includes(t.id) ? 'white' : 'var(--text-muted)' }}>{t.label}</span>
-                      </label>
-                    ))}
-                    {scraperFilters.types.includes('venda') && (
-                      <div style={{ marginTop: '14px' }}>
-                        <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>💰 Faixa de Preço (Venda)</p>
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                          <select
-                            value={scraperFilters.priceMin}
-                            onChange={e => saveScraperFilters({ ...scraperFilters, priceMin: parseInt(e.target.value) })}
-                            style={{ flex: 1, background: 'var(--bg-dark)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', padding: '6px', fontSize: '0.8rem' }}
-                          >
-                            {[500000, 1000000, 2000000, 3000000, 5000000, 10000000].map(v => <option key={v} value={v}>R$ {(v / 1000000).toFixed(1)}M</option>)}
-                          </select>
-                          <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>até</span>
-                          <select
-                            value={scraperFilters.priceMax}
-                            onChange={e => saveScraperFilters({ ...scraperFilters, priceMax: parseInt(e.target.value) })}
-                            style={{ flex: 1, background: 'var(--bg-dark)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', padding: '6px', fontSize: '0.8rem' }}
-                          >
-                            {[1000000, 5000000, 10000000, 20000000, 30000000, 50000000, 100000000].map(v => <option key={v} value={v}>R$ {(v / 1000000).toFixed(0)}M</option>)}
-                          </select>
-                        </div>
-                      </div>
-                    )}
-
-                    {scraperFilters.types.includes('aluguel') && (
-                      <div style={{ marginTop: '14px' }}>
-                        <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🔑 Faixa de Preço (Aluguel)</p>
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                          <select
-                            value={scraperFilters.priceMinAluguel || 1000}
-                            onChange={e => saveScraperFilters({ ...scraperFilters, priceMinAluguel: parseInt(e.target.value) })}
-                            style={{ flex: 1, background: 'var(--bg-dark)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', padding: '6px', fontSize: '0.8rem' }}
-                          >
-                            {[500, 1000, 2000, 3000, 5000, 10000].map(v => <option key={v} value={v}>R$ {(v / 1000).toFixed(1)}k</option>)}
-                          </select>
-                          <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>até</span>
-                          <select
-                            value={scraperFilters.priceMaxAluguel || 50000}
-                            onChange={e => saveScraperFilters({ ...scraperFilters, priceMaxAluguel: parseInt(e.target.value) })}
-                            style={{ flex: 1, background: 'var(--bg-dark)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', padding: '6px', fontSize: '0.8rem' }}
-                          >
-                            {[5000, 10000, 20000, 30000, 50000, 100000].map(v => <option key={v} value={v}>R$ {(v / 1000).toFixed(0)}k</option>)}
-                          </select>
-                        </div>
-                      </div>
-                    )}
+              <div className="dashboard-item">
+                <button
+                  onClick={() => {
+                    setShowCalendar(!showCalendar);
+                    setShowFilters(false);
+                    setShowMonitor(false);
+                  }}
+                  className={`control-btn ${showCalendar ? 'active' : ''}`}
+                >
+                  <div className="icon-circle"><Calendar size={18} /></div>
+                  <div className="btn-label">
+                    <span>Agenda</span>
+                    <small>{nextRun ? 'Robô Agendado' : 'Configurar Horário'}</small>
                   </div>
-                </div>
+                </button>
+              </div>
 
-                {/* Resumo visual */}
-                <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(99,102,241,0.08)', borderRadius: '10px', border: '1px solid rgba(99,102,241,0.15)', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  🔍 Buscando: <b style={{ color: 'white' }}>{scraperFilters.regions.join(', ')}</b> · Tipo: <b style={{ color: 'white' }}>{scraperFilters.types.join(', ')}</b>
-                  {scraperFilters.types.includes('venda') && <> · Venda: <b style={{ color: 'white' }}>R${(scraperFilters.priceMin / 1000000).toFixed(1)}M+</b></>}
-                  {scraperFilters.types.includes('aluguel') && <> · Aluguel: <b style={{ color: 'white' }}>R${(scraperFilters.priceMinAluguel / 1000).toFixed(1)}k+</b></>}
-                  · Apenas particulares
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Calendário de Agendamento */}
-          <AnimatePresence>
-            {showCalendar && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="glass"
-                style={{ marginBottom: '25px', padding: '20px', overflow: 'hidden' }}
-              >
-                <h4 style={{ marginBottom: '15px', fontWeight: 600 }}>Escolha a data e hora:</h4>
-                <div className="calendar-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
-                  <CalendarBox
-                    onChange={setSelectedDate}
-                    value={selectedDate}
-                    minDate={new Date()}
-                    className="custom-calendar"
-                  />
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '15px', width: '100%', justifyContent: 'center', background: 'rgba(0,0,0,0.2)', padding: '15px', borderRadius: '12px' }}>
-                    <Clock size={20} color="var(--primary)" />
-                    <span style={{ fontWeight: 600 }}>Horário:</span>
-                    <input
-                      type="time"
-                      value={scheduledTime}
-                      onChange={(e) => setScheduledTime(e.target.value)}
-                      style={{
-                        background: 'var(--bg-dark)',
-                        border: '1px solid var(--primary)',
-                        color: 'white',
-                        padding: '8px',
-                        borderRadius: '8px',
-                        fontSize: '1.1rem'
-                      }}
-                    />
+              <div className="dashboard-item">
+                <button
+                  onClick={() => {
+                    setShowMonitor(!showMonitor);
+                    setShowFilters(false);
+                    setShowCalendar(false);
+                  }}
+                  className={`control-btn ${showMonitor ? 'active' : ''}`}
+                >
+                  <div className="icon-circle" style={{ background: isScraping ? 'var(--accent)' : 'rgba(255,255,255,0.08)' }}>
+                    <Activity size={18} className={isScraping ? 'spin' : ''} />
                   </div>
-
-                  <button
-                    onClick={handleSaveSchedule}
-                    style={{
-                      width: '100%',
-                      background: 'var(--primary)',
-                      color: 'white',
-                      padding: '12px',
-                      borderRadius: '12px',
-                      fontWeight: 800,
-                      fontSize: '1rem',
-                      boxShadow: '0 4px 15px rgba(99, 102, 241, 0.3)'
-                    }}
-                  >
-                    SALVAR AGENDAMENTO
-                  </button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Monitor em Tempo Real */}
-          <AnimatePresence>
-            {showMonitor && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="glass"
-                style={{ marginBottom: '25px', padding: '20px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--primary)', position: 'relative' }}
-              >
-                {/* Botão para fechar o monitor manualmente */}
-                {!isScraping && (
-                  <button
-                    onClick={() => setShowMonitor(false)}
-                    style={{
-                      position: 'absolute',
-                      top: '15px',
-                      right: '15px',
-                      background: 'rgba(255,255,255,0.05)',
-                      color: 'white',
-                      border: 'none',
-                      cursor: 'pointer',
-                      width: '30px',
-                      height: '30px',
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      transition: 'all 0.2s',
-                    }}
-                    onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
-                    onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
-                    title="Fechar Monitor"
-                  >
-                    <X size={18} />
-                  </button>
-                )}
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                    Monitor de Extração Live
-                  </span>
-                  <span style={{ fontSize: '0.9rem', color: 'white' }}>{liveStatus.progress}%</span>
-                </div>
-
-                {/* Botão de Cancelar (SÓ APARECE DURANTE SCRAPING) */}
-                {isScraping && (
-                  <button
-                    onClick={cancelScraper}
-                    style={{
-                      position: 'absolute',
-                      top: '15px',
-                      right: '15px',
-                      background: 'rgba(244, 63, 94, 0.2)',
-                      color: '#f43f5e',
-                      border: '1px solid rgba(244, 63, 94, 0.4)',
-                      padding: '5px 12px',
-                      borderRadius: '8px',
-                      fontSize: '0.7rem',
-                      fontWeight: 800,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <X size={14} />
-                    PARAR AGORA
-                  </button>
-                )}
-
-                <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '10px', overflow: 'hidden', marginBottom: '15px' }}>
-                  <motion.div
-                    style={{ height: '100%', background: 'linear-gradient(90deg, var(--primary), var(--accent))' }}
-                    animate={{ width: `${liveStatus.progress}%` }}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  {isScraping ? (
-                    <div className="spin" style={{ width: '15px', height: '15px', border: '2px solid var(--primary)', borderTopColor: 'transparent', borderRadius: '50%' }} />
-                  ) : (
-                    <span style={{ fontSize: '1.2rem' }}>{liveStatus.progress === 100 ? '✅' : 'ℹ️'}</span>
-                  )}
-                  <span style={{
-                    fontSize: '0.95rem',
-                    color: liveStatus.progress === 100 ? '#10b981' : 'var(--text-main)',
-                    fontWeight: liveStatus.progress === 100 ? 700 : 500
-                  }}>
-                    {liveStatus.progress === 100
-                      ? `FINALIZADO: ${liveStatus.links?.length || 0} imóveis extraídos com sucesso!`
-                      : liveStatus.message}
-                  </span>
-                </div>
-
-                {liveStatus.currentItem && isScraping && (
-                  <div style={{ marginTop: '10px', fontSize: '0.8rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '8px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px', borderLeft: '3px solid var(--primary)' }}>
-                    PROCESSANDO: {liveStatus.currentItem}
+                  <div className="btn-label">
+                    <span>Monitor</span>
+                    <small>{isScraping ? 'Extraindo...' : 'Ver Status Live'}</small>
                   </div>
-                )}
+                </button>
+              </div>
 
-                {liveStatus.links && liveStatus.links.length > 0 && (
-                  <div style={{ marginTop: '15px' }}>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase' }}>
-                      Registros Encontrados ({liveStatus.links.length}):
-                    </div>
-                    <div style={{ maxHeight: '150px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                      {liveStatus.links.map((link, idx) => (
-                        <div key={idx} className="glass" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', fontSize: '0.8rem', background: 'rgba(255,255,255,0.02)' }}>
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%', color: 'var(--text-main)' }}>
-                            {link}
-                          </span>
-                          <div style={{ display: 'flex', gap: '10px' }}>
-                            <button
-                              onClick={() => {
-                                navigator.clipboard.writeText(link);
-                              }}
-                              style={{ background: 'transparent', padding: '0', color: 'var(--text-muted)' }}
-                              title="Copiar Link"
-                            >
-                              <Copy size={14} />
-                            </button>
-                            <a
-                              href={link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{ color: 'var(--primary)', display: 'flex', alignItems: 'center' }}
-                              title="Abrir Anúncio"
-                            >
-                              <ExternalLink size={14} />
-                            </a>
-                          </div>
-                        </div>
-                      )).reverse()}
+              <div className="dashboard-item limit-panel">
+                <div className="control-btn no-pointer">
+                  <div className="icon-circle" onClick={() => {
+                    const newState = !limitEnabled;
+                    setLimitEnabled(newState);
+                    saveConfig('limit_enabled', newState);
+                  }} style={{ background: limitEnabled ? 'var(--primary)' : 'rgba(255,255,255,0.08)', cursor: 'pointer' }}>
+                    <Smartphone size={18} style={{ color: 'white' }} />
+                  </div>
+                  <div className="btn-label">
+                    <span>Limite</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <input
+                        type="number"
+                        value={limit}
+                        disabled={!limitEnabled}
+                        onChange={(e) => {
+                          setLimit(e.target.value);
+                          saveConfig('limit_value', e.target.value);
+                        }}
+                        className="inline-input"
+                      />
+                      <small>anúncios</small>
                     </div>
                   </div>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Container de Resultados - Estilo Dashboard */}
-          <div className="glass" style={{ padding: '25px', borderRadius: '24px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.05)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }}>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'white', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '8px', height: '18px', background: 'var(--primary)', borderRadius: '4px' }} />
-                Descobertas Recentes
-              </h2>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.05)', padding: '6px 12px', borderRadius: '20px', fontWeight: 700, border: '1px solid rgba(255,255,255,0.05)' }}>
-                {filteredListings.length} REGISTROS
+                </div>
               </div>
+
             </div>
 
-            <div className="search-tabs-container" style={{ margin: '0 0 25px 0' }}>
-              <div className="search-bar">
+            <div className="search-tabs-container" style={{ margin: '15px 0 10px 0' }}>
+              <div className="search-bar" style={{ marginBottom: '10px' }}>
                 <Search className="search-icon" size={18} />
                 <input
                   type="text"
@@ -823,7 +563,7 @@ function App() {
                 )}
               </div>
 
-              <div className="tabs-nav">
+              <div className="tabs-nav" style={{ marginBottom: '10px' }}>
                 {[
                   { id: 'active', label: 'Todos', icon: <Layout size={14} /> },
                   { id: 'vendas', label: 'Vendas', icon: <Home size={14} /> },
@@ -833,7 +573,10 @@ function App() {
                 ].map(t => (
                   <button
                     key={t.id}
-                    onClick={() => setFilter(t.id)}
+                    onClick={() => {
+                      setFilter(t.id);
+                      setSubFilter('all');
+                    }}
                     className={filter === t.id ? 'active' : ''}
                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                   >
@@ -842,39 +585,380 @@ function App() {
                   </button>
                 ))}
               </div>
-            </div>
 
-            {loading ? (
-              <div style={{ padding: '80px 20px', textAlign: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '20px', border: '1px dashed rgba(255,255,255,0.1)' }}>
-                <RefreshCw size={40} className="spin" style={{ color: 'var(--primary)', marginBottom: '20px', opacity: 0.5 }} />
-                <p style={{ fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.5px' }}>SINCRONIZANDO COM A BASE...</p>
-              </div>
-            ) : filteredListings.length === 0 ? (
-              <div style={{ padding: '100px 20px', textAlign: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '20px', border: '1px dashed rgba(255,255,255,0.1)' }}>
-                <div style={{ width: '60px', height: '60px', background: 'rgba(255,255,255,0.03)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-                  <Search size={24} style={{ color: 'var(--text-muted)', opacity: 0.4 }} />
-                </div>
-                <h3 style={{ fontSize: '1.1rem', marginBottom: '8px', color: 'white' }}>Nenhum anúncio encontrado</h3>
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', maxWidth: '280px', margin: '0 auto' }}>
-                  Tente remover os termos de busca ou mudar a aba de filtros.
-                </p>
-              </div>
-            ) : (
-              <div className="listings-grid">
-                <AnimatePresence mode="popLayout">
-                  {filteredListings.map((l) => (
-                    <ListingCard
-                      key={l.id}
-                      listing={l}
-                      onUpdate={handleUpdateListing}
-                    />
+              {availableSubFilters.length > 0 && (
+                <div className="sub-tabs-nav" style={{
+                  display: 'flex',
+                  gap: '8px',
+                  overflowX: 'auto',
+                  padding: '5px 0 10px 0',
+                  scrollbarWidth: 'none'
+                }}>
+                  {availableSubFilters.map(type => (
+                    <button
+                      key={type}
+                      onClick={() => setSubFilter(type)}
+                      style={{
+                        padding: '6px 14px',
+                        fontSize: '0.65rem',
+                        borderRadius: '100px',
+                        whiteSpace: 'nowrap',
+                        background: subFilter === type ? 'var(--primary)' : 'rgba(255,255,255,0.03)',
+                        color: subFilter === type ? 'white' : 'var(--text-muted)',
+                        border: `1px solid ${subFilter === type ? 'var(--primary)' : 'rgba(255,255,255,0.08)'}`,
+                        fontWeight: 800,
+                        letterSpacing: '0.5px',
+                        textTransform: 'uppercase',
+                        transition: '0.2s'
+                      }}
+                    >
+                      {type === 'all' ? 'TUDO' : type}
+                    </button>
                   ))}
-                </AnimatePresence>
-              </div>
-            )}
+                </div>
+              )}
+            </div>
           </div>
         </>
       )}
+
+      {/* Painel de Filtros do Scraper */}
+      <AnimatePresence>
+        {showFilters && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="glass"
+            style={{ marginBottom: '25px', padding: '20px', overflow: 'hidden', border: '1px solid rgba(99,102,241,0.2)' }}
+          >
+            <h4 style={{ marginBottom: '16px', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '1px', textTransform: 'uppercase', color: 'var(--primary)' }}>
+              ⚙️ Configuração da Busca
+            </h4>
+
+            <div className="filters-grid">
+              {/* Regiões */}
+              <div>
+                <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>📍 Regiões</p>
+                {[{ id: 'alphaville', label: 'Alphaville', color: '#6366f1' }, { id: 'tambore', label: 'Tamboré', color: '#f59e0b' }, { id: 'barueri', label: 'Barueri', color: '#10b981' }].map(r => (
+                  <label key={r.id} onClick={() => toggleRegion(r.id)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', marginBottom: '6px', borderRadius: '8px', cursor: 'pointer', background: scraperFilters.regions.includes(r.id) ? `${r.color}22` : 'rgba(255,255,255,0.03)', border: `1px solid ${scraperFilters.regions.includes(r.id) ? r.color + '55' : 'rgba(255,255,255,0.08)'}`, transition: 'all 0.2s' }}>
+                    <span style={{ width: '18px', height: '18px', borderRadius: '5px', background: scraperFilters.regions.includes(r.id) ? r.color : 'transparent', border: `2px solid ${scraperFilters.regions.includes(r.id) ? r.color : 'rgba(255,255,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', transition: 'all 0.2s' }}>
+                      {scraperFilters.regions.includes(r.id) ? '✓' : ''}
+                    </span>
+                    <span style={{ fontWeight: 600, fontSize: '0.9rem', color: scraperFilters.regions.includes(r.id) ? 'white' : 'var(--text-muted)' }}>{r.label}</span>
+                  </label>
+                ))}
+              </div>
+
+              {/* Tipo + Preço */}
+              <div>
+                <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🏠 Tipo de Negócio</p>
+                {[{ id: 'venda', label: 'Venda', color: '#6366f1' }, { id: 'aluguel', label: 'Aluguel', color: '#f43f5e' }].map(t => (
+                  <label key={t.id} onClick={() => toggleType(t.id)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', marginBottom: '6px', borderRadius: '8px', cursor: 'pointer', background: scraperFilters.types.includes(t.id) ? `${t.color}22` : 'rgba(255,255,255,0.03)', border: `1px solid ${scraperFilters.types.includes(t.id) ? t.color + '55' : 'rgba(255,255,255,0.08)'}`, transition: 'all 0.2s' }}>
+                    <span style={{ width: '18px', height: '18px', borderRadius: '5px', background: scraperFilters.types.includes(t.id) ? t.color : 'transparent', border: `2px solid ${scraperFilters.types.includes(t.id) ? t.color : 'rgba(255,255,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', transition: 'all 0.2s' }}>
+                      {scraperFilters.types.includes(t.id) ? '✓' : ''}
+                    </span>
+                    <span style={{ fontWeight: 600, fontSize: '0.9rem', color: scraperFilters.types.includes(t.id) ? 'white' : 'var(--text-muted)' }}>{t.label}</span>
+                  </label>
+                ))}
+                {scraperFilters.types.includes('venda') && (
+                  <div style={{ marginTop: '14px' }}>
+                    <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>💰 Faixa de Preço (Venda)</p>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <select
+                        value={scraperFilters.priceMin}
+                        onChange={e => saveScraperFilters({ ...scraperFilters, priceMin: parseInt(e.target.value) })}
+                        style={{ flex: 1, background: 'var(--bg-dark)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', padding: '6px', fontSize: '0.8rem' }}
+                      >
+                        {[500000, 1000000, 2000000, 3000000, 5000000, 10000000].map(v => <option key={v} value={v}>R$ {(v / 1000000).toFixed(1)}M</option>)}
+                      </select>
+                      <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>até</span>
+                      <select
+                        value={scraperFilters.priceMax}
+                        onChange={e => saveScraperFilters({ ...scraperFilters, priceMax: parseInt(e.target.value) })}
+                        style={{ flex: 1, background: 'var(--bg-dark)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', padding: '6px', fontSize: '0.8rem' }}
+                      >
+                        {[1000000, 5000000, 10000000, 20000000, 30000000, 50000000, 100000000].map(v => <option key={v} value={v}>R$ {(v / 1000000).toFixed(0)}M</option>)}
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {scraperFilters.types.includes('aluguel') && (
+                  <div style={{ marginTop: '14px' }}>
+                    <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🔑 Faixa de Preço (Aluguel)</p>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <select
+                        value={scraperFilters.priceMinAluguel || 1000}
+                        onChange={e => saveScraperFilters({ ...scraperFilters, priceMinAluguel: parseInt(e.target.value) })}
+                        style={{ flex: 1, background: 'var(--bg-dark)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', padding: '6px', fontSize: '0.8rem' }}
+                      >
+                        {[500, 1000, 2000, 3000, 5000, 10000].map(v => <option key={v} value={v}>R$ {(v / 1000).toFixed(1)}k</option>)}
+                      </select>
+                      <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>até</span>
+                      <select
+                        value={scraperFilters.priceMaxAluguel || 50000}
+                        onChange={e => saveScraperFilters({ ...scraperFilters, priceMaxAluguel: parseInt(e.target.value) })}
+                        style={{ flex: 1, background: 'var(--bg-dark)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', padding: '6px', fontSize: '0.8rem' }}
+                      >
+                        {[5000, 10000, 20000, 30000, 50000, 100000].map(v => <option key={v} value={v}>R$ {(v / 1000).toFixed(0)}k</option>)}
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Resumo visual */}
+            <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(99,102,241,0.08)', borderRadius: '10px', border: '1px solid rgba(99,102,241,0.15)', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              🔍 Buscando: <b style={{ color: 'white' }}>{scraperFilters.regions.join(', ')}</b> · Tipo: <b style={{ color: 'white' }}>{scraperFilters.types.join(', ')}</b>
+              {scraperFilters.types.includes('venda') && <> · Venda: <b style={{ color: 'white' }}>R${(scraperFilters.priceMin / 1000000).toFixed(1)}M+</b></>}
+              {scraperFilters.types.includes('aluguel') && <> · Aluguel: <b style={{ color: 'white' }}>R${(scraperFilters.priceMinAluguel / 1000).toFixed(1)}k+</b></>}
+              · Apenas particulares
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Calendário de Agendamento */}
+      <AnimatePresence>
+        {showCalendar && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="glass"
+            style={{ marginBottom: '25px', padding: '20px', overflow: 'hidden' }}
+          >
+            <h4 style={{ marginBottom: '15px', fontWeight: 600 }}>Escolha a data e hora:</h4>
+            <div className="calendar-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+              <CalendarBox
+                onChange={setSelectedDate}
+                value={selectedDate}
+                minDate={new Date()}
+                className="custom-calendar"
+              />
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px', width: '100%', justifyContent: 'center', background: 'rgba(0,0,0,0.2)', padding: '15px', borderRadius: '12px' }}>
+                <Clock size={20} color="var(--primary)" />
+                <span style={{ fontWeight: 600 }}>Horário:</span>
+                <input
+                  type="time"
+                  value={scheduledTime}
+                  onChange={(e) => setScheduledTime(e.target.value)}
+                  style={{
+                    background: 'var(--bg-dark)',
+                    border: '1px solid var(--primary)',
+                    color: 'white',
+                    padding: '8px',
+                    borderRadius: '8px',
+                    fontSize: '1.1rem'
+                  }}
+                />
+              </div>
+
+              <button
+                onClick={handleSaveSchedule}
+                style={{
+                  width: '100%',
+                  background: 'var(--primary)',
+                  color: 'white',
+                  padding: '12px',
+                  borderRadius: '12px',
+                  fontWeight: 800,
+                  fontSize: '1rem',
+                  boxShadow: '0 4px 15px rgba(99, 102, 241, 0.3)'
+                }}
+              >
+                SALVAR AGENDAMENTO
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Monitor em Tempo Real */}
+      <AnimatePresence>
+        {showMonitor && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="glass"
+            style={{ marginBottom: '25px', padding: '20px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--primary)', position: 'relative' }}
+          >
+            {/* Botão para fechar o monitor manualmente */}
+            {!isScraping && (
+              <button
+                onClick={() => setShowMonitor(false)}
+                style={{
+                  position: 'absolute',
+                  top: '15px',
+                  right: '15px',
+                  background: 'rgba(255,255,255,0.05)',
+                  color: 'white',
+                  border: 'none',
+                  cursor: 'pointer',
+                  width: '30px',
+                  height: '30px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s',
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                title="Fechar Monitor"
+              >
+                <X size={18} />
+              </button>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                Monitor de Extração Live
+              </span>
+              <span style={{ fontSize: '0.9rem', color: 'white' }}>{liveStatus.progress}%</span>
+            </div>
+
+            {/* Botão de Cancelar (SÓ APARECE DURANTE SCRAPING) */}
+            {isScraping && (
+              <button
+                onClick={cancelScraper}
+                style={{
+                  position: 'absolute',
+                  top: '15px',
+                  right: '15px',
+                  background: 'rgba(244, 63, 94, 0.2)',
+                  color: '#f43f5e',
+                  border: '1px solid rgba(244, 63, 94, 0.4)',
+                  padding: '5px 12px',
+                  borderRadius: '8px',
+                  fontSize: '0.7rem',
+                  fontWeight: 800,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  cursor: 'pointer'
+                }}
+              >
+                <X size={14} />
+                PARAR AGORA
+              </button>
+            )}
+
+            <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '10px', overflow: 'hidden', marginBottom: '15px' }}>
+              <motion.div
+                style={{ height: '100%', background: 'linear-gradient(90deg, var(--primary), var(--accent))' }}
+                animate={{ width: `${liveStatus.progress}%` }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              {isScraping ? (
+                <div className="spin" style={{ width: '15px', height: '15px', border: '2px solid var(--primary)', borderTopColor: 'transparent', borderRadius: '50%' }} />
+              ) : (
+                <span style={{ fontSize: '1.2rem' }}>{liveStatus.progress === 100 ? '✅' : 'ℹ️'}</span>
+              )}
+              <span style={{
+                fontSize: '0.95rem',
+                color: liveStatus.progress === 100 ? '#10b981' : 'var(--text-main)',
+                fontWeight: liveStatus.progress === 100 ? 700 : 500
+              }}>
+                {liveStatus.progress === 100
+                  ? `FINALIZADO: ${liveStatus.links?.length || 0} imóveis extraídos com sucesso!`
+                  : liveStatus.message}
+              </span>
+            </div>
+
+            {liveStatus.currentItem && isScraping && (
+              <div style={{ marginTop: '10px', fontSize: '0.8rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '8px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px', borderLeft: '3px solid var(--primary)' }}>
+                PROCESSANDO: {liveStatus.currentItem}
+              </div>
+            )}
+
+            {liveStatus.links && liveStatus.links.length > 0 && (
+              <div style={{ marginTop: '15px' }}>
+                <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase' }}>
+                  Registros Encontrados ({liveStatus.links.length}):
+                </div>
+                <div style={{ maxHeight: '150px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  {liveStatus.links.map((link, idx) => (
+                    <div key={idx} className="glass" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', fontSize: '0.8rem', background: 'rgba(255,255,255,0.02)' }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%', color: 'var(--text-main)' }}>
+                        {link}
+                      </span>
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(link);
+                          }}
+                          style={{ background: 'transparent', padding: '0', color: 'var(--text-muted)' }}
+                          title="Copiar Link"
+                        >
+                          <Copy size={14} />
+                        </button>
+                        <a
+                          href={link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: 'var(--primary)', display: 'flex', alignItems: 'center' }}
+                          title="Abrir Anúncio"
+                        >
+                          <ExternalLink size={14} />
+                        </a>
+                      </div>
+                    </div>
+                  )).reverse()}
+                </div>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Container de Resultados - Estilo Dashboard */}
+      <div className="glass" style={{ padding: '25px', borderRadius: '24px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.05)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }}>
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'white', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ width: '8px', height: '18px', background: 'var(--primary)', borderRadius: '4px' }} />
+            Descobertas Recentes
+          </h2>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.05)', padding: '6px 12px', borderRadius: '20px', fontWeight: 700, border: '1px solid rgba(255,255,255,0.05)' }}>
+            {filteredListings.length} REGISTROS
+          </div>
+        </div>
+
+        {loading ? (
+          <div style={{ padding: '80px 20px', textAlign: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '20px', border: '1px dashed rgba(255,255,255,0.1)' }}>
+            <RefreshCw size={40} className="spin" style={{ color: 'var(--primary)', marginBottom: '20px', opacity: 0.5 }} />
+            <p style={{ fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.5px' }}>SINCRONIZANDO COM A BASE...</p>
+          </div>
+        ) : filteredListings.length === 0 ? (
+          <div style={{ padding: '100px 20px', textAlign: 'center', background: 'rgba(255,255,255,0.02)', borderRadius: '20px', border: '1px dashed rgba(255,255,255,0.1)' }}>
+            <div style={{ width: '60px', height: '60px', background: 'rgba(255,255,255,0.03)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+              <Search size={24} style={{ color: 'var(--text-muted)', opacity: 0.4 }} />
+            </div>
+            <h3 style={{ fontSize: '1.1rem', marginBottom: '8px', color: 'white' }}>Nenhum anúncio encontrado</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', maxWidth: '280px', margin: '0 auto' }}>
+              Tente remover os termos de busca ou mudar a aba de filtros.
+            </p>
+          </div>
+        ) : (
+          <div className="listings-grid">
+            <AnimatePresence mode="popLayout">
+              {filteredListings.map((l) => (
+                <ListingCard
+                  key={l.id}
+                  listing={l}
+                  onUpdate={handleUpdateListing}
+                />
+              ))}
+            </AnimatePresence>
+          </div>
+        )}
+      </div>
 
       <style>{`
         .spin { animation: spin 1s linear infinite; }
@@ -1080,7 +1164,7 @@ function TutorialStep({ step, onNext, onSkip }) {
   );
 }
 
-function ListingCard({ listing, onUpdate }) {
+const ListingCard = React.memo(({ listing, onUpdate }) => {
   const [note, setNote] = useState(listing.get("notes") || "");
   const [showNote, setShowNote] = useState(false);
 
@@ -1325,6 +1409,6 @@ function ListingCard({ listing, onUpdate }) {
       </AnimatePresence>
     </motion.div>
   );
-}
+});
 
 export default App;

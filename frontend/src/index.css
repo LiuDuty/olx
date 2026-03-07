@@ -167,6 +167,23 @@ button:active {
   font-size: 0.8rem;
 }
 
+.sticky-controls {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: #030712;
+  margin-left: -10px;
+  margin-right: -10px;
+  padding: 10px 10px 0 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.tab-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .header-actions {
   display: flex;
   gap: 12px;
